@@ -2,9 +2,9 @@ OpenCV 3.0.0 CVPR Tutorial
 =================
 This repository contains the code demonstrated at the OpenCV 3.0 Tutorial for CVPR 2014.
 
-# Getting started
+## Getting started
 
-## Installing local OpenCV 3.0.0
+### Installing local OpenCV 3.0.0
 ````
 cd opencv
 mkdir build
@@ -13,7 +13,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=../install
 make -j<# processors to use> install
 ````
 
-## Installing local Aruco 
+### Installing local Aruco 
 ````
 cd 3rd_party/aruco/trunk/
 mkdir build
@@ -22,6 +22,6 @@ cmake .. -DCMAKE_INSTALL_PREFIX=../install
 make -j<# processors to use> install
 ````
 
-# Apps
+## Apps
 
-## Multiple fisheye camera calibration
+### Multiple fisheye camera calibration
