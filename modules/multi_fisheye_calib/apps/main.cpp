@@ -8,6 +8,7 @@
 #include <cstdlib>
 
 void Autobalance(cv::Mat* im);
+void DetectArucoMarkers(cv::Mat* im, std::vector<aruco::Marker>* markers);
 
 struct camera {
   cv::Matx33d K;
@@ -15,6 +16,7 @@ struct camera {
   cv::Size size;
 };
 
+aruco::MarkerDetector aruco_detector;
 aruco::BoardConfiguration aruco_board_config;
 std::vector<int> aruco_marker_map;
 std::vector<cv::Point3f> aruco_board_pts;
@@ -25,7 +27,8 @@ std::vector<std::vector<std::vector<cv::Point3f> > > marker_pnts_map_;
 std::vector<std::vector<cv::Mat> > rvecs_;
 std::vector<std::vector<cv::Mat> > tvecs_;
 
-bool autobalance = true;
+bool AUTOBALANCE = true;
+bool DRAWMARKERS = true;
 
 int main(int argc, char *argv[]) {
   
@@ -67,7 +70,7 @@ int main(int argc, char *argv[]) {
   cv::namedWindow(window_name, CV_WINDOW_AUTOSIZE); 
   std::vector<cv::Mat> frame(num_cameras);
   cv::Mat frames;
-  cv::Mat frame_edit;
+  //  cv::Mat frame_edit;
 
   for (int i = 0; i < num_cameras; ++i) {
     video_stream[i].set(CV_CAP_PROP_RECTIFICATION, 1);
@@ -81,21 +84,19 @@ int main(int argc, char *argv[]) {
       cv::hconcat(frames, frame[i], frames);
   }
 
+  std::vector<aruco::Marker> aruco_markers_detected; ////       
   cv::imshow(window_name, frames);
   int keypress = cv::waitKey(30);
   
   while(video_stream[0].read(frame[0])) {
     frames = frame[0];
-    cv::cvtColor(frame[0], frame_edit, CV_BGR2GRAY);
-    Autobalance(&frame_edit);
+
+    DetectArucoMarkers(&(frame[0]), &aruco_markers_detected);
 
     for (int i = 1; i < num_cameras; ++i) {
       video_stream[i].read(frame[i]);  
-
-  
-      std::vector<aruco::Marker> aruco_markers_detected; ////      
-
-      //    cv::hconcat(frames, frame[i], frames);
+      DetectArucoMarkers(&(frame[i]), &aruco_markers_detected);
+      cv::hconcat(frames, frame[i], frames);
     }   
     cv::imshow(window_name, frames);
     keypress = cv::waitKey(30);
@@ -108,7 +109,18 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-
+void DetectArucoMarkers(cv::Mat* im, std::vector<aruco::Marker>* markers) {
+  cv::Mat im_copy;
+  cv::cvtColor(*im, im_copy, CV_BGR2GRAY);
+  if (AUTOBALANCE) Autobalance(&im_copy);
+  markers->clear();
+  aruco_detector.detect(im_copy, *markers);
+  if (DRAWMARKERS) {
+    for (int i = 0; i < markers->size(); ++i) {
+      (*markers)[i].draw(*im, cv::Scalar(0, 0, 255), 2);
+    }
+  }
+}
                                                                  
 void Autobalance(cv::Mat* im) {
   if (!(im == NULL)) {
