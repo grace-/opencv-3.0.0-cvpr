@@ -7,6 +7,14 @@
 #include <vector>
 #include <cstdlib>
 
+void Autobalance(cv::Mat* im);
+
+struct camera {
+  cv::Matx33d K;
+  cv::Matx<double, 5, 1> distorsion;
+  cv::Size size;
+};
+
 aruco::BoardConfiguration aruco_board_config;
 std::vector<int> aruco_marker_map;
 std::vector<cv::Point3f> aruco_board_pts;
@@ -16,6 +24,8 @@ std::vector<std::vector<std::vector<cv::Point2f> > > marker_pnts_;
 std::vector<std::vector<std::vector<cv::Point3f> > > marker_pnts_map_;
 std::vector<std::vector<cv::Mat> > rvecs_;
 std::vector<std::vector<cv::Mat> > tvecs_;
+
+bool autobalance = true;
 
 int main(int argc, char *argv[]) {
   
@@ -53,30 +63,41 @@ int main(int argc, char *argv[]) {
     aruco_marker_map[aruco_board_config[i].id] = i;
   }
 
+  std::vector<camera> cameras(num_cameras);
   cv::namedWindow(window_name, CV_WINDOW_AUTOSIZE); 
-  std::vector<cv::Mat> camera_frame(num_cameras);
-  cv::Mat all_frames;
+  std::vector<cv::Mat> frame(num_cameras);
+  cv::Mat frames;
+  cv::Mat frame_edit;
 
   for (int i = 0; i < num_cameras; ++i) {
     video_stream[i].set(CV_CAP_PROP_RECTIFICATION, 1);
-    video_stream[i].read(camera_frame[i]);  
+    video_stream[i].read(frame[i]);  
+    cameras[i].size = frame[i].size();
+    cameras[i].K = cv::Matx33d::eye();
+    cameras[i].distorsion = cv::Matx<double, 5, 1>::zeros();
     if (i == 0) 
-      all_frames = camera_frame[i];
+      frames = frame[i];
     else 
-      cv::hconcat(all_frames, camera_frame[i], all_frames);
+      cv::hconcat(frames, frame[i], frames);
   }
 
-  cv::imshow(window_name, all_frames);
+  cv::imshow(window_name, frames);
   int keypress = cv::waitKey(30);
   
-  while(video_stream[0].read(camera_frame[0])) {
-    all_frames = camera_frame[0];
+  while(video_stream[0].read(frame[0])) {
+    frames = frame[0];
+    cv::cvtColor(frame[0], frame_edit, CV_BGR2GRAY);
+    Autobalance(&frame_edit);
+
     for (int i = 1; i < num_cameras; ++i) {
-      video_stream[i].read(camera_frame[i]);    
-      std::vector<aruco::Marker> aruco_markers_detected; ////
-      cv::hconcat(all_frames, camera_frame[i], all_frames);
+      video_stream[i].read(frame[i]);  
+
+  
+      std::vector<aruco::Marker> aruco_markers_detected; ////      
+
+      //    cv::hconcat(frames, frame[i], frames);
     }   
-    cv::imshow(window_name, all_frames);
+    cv::imshow(window_name, frames);
     keypress = cv::waitKey(30);
     if (keypress == 27) break;
   }
@@ -89,3 +110,14 @@ int main(int argc, char *argv[]) {
 
 
                                                                  
+void Autobalance(cv::Mat* im) {
+  if (!(im == NULL)) {
+    double min_px, max_px;
+    cv::minMaxLoc(*im, &min_px, &max_px);
+    double d = 255.0f/(max_px - min_px);
+    int n = im->rows * im->cols;
+    for (int i = 0; i < n; ++i) {
+      im->data[i] = static_cast<unsigned char>((static_cast<double>(im->data[i]) - min_px) * d);
+    }
+  }
+}
