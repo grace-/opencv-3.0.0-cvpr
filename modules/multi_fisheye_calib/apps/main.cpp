@@ -1,7 +1,9 @@
-#include <aruco/aruco.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
+
+#include <aruco/aruco.h>
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -15,9 +17,9 @@ bool DetectArucoMarkers(
     std::vector<cv::Point2f>* aruco_marker_detects_2f,
     std::vector<cv::Point3f>* aruco_marker_detects_3f);
 
-struct camera {
-  cv::Matx33d K;
-  cv::Matx<double, 5, 1> distorsion;
+struct Camera {
+  cv::Matx33f K;
+  cv::Matx<double, 4, 1> distorsion;
   cv::Size size;
 };
 
@@ -33,7 +35,6 @@ std::vector<std::vector<cv::Mat> > rvecs_;
 std::vector<std::vector<cv::Mat> > tvecs_;
 
 float square;
-//std::vector<cv::Rect> ROIs;
 
 bool AUTOBALANCE = true;
 bool DRAWMARKERS = true;
@@ -54,10 +55,9 @@ int main(int argc, char *argv[]) {
   else num_cameras = 1;
 
   std::vector<cv::VideoCapture> video_stream(num_cameras);
-  std::vector<camera> cameras(num_cameras);
+  std::vector<Camera> cameras(num_cameras);
   std::vector<int> video_num(num_cameras);   
   video_num[0] = atoi(argv[2]);
-  //  ROIs.resize(num_cameras);
 
   for (int i = 0; i < num_cameras; ++i) {
     video_num[i] = video_num[0] + i;
@@ -72,13 +72,12 @@ int main(int argc, char *argv[]) {
       std::cout << "Video stream /dev/fw" << video_num[i] << " opened.\n";
     }
     cameras[i].size = cv::Size(0, 0);
-    cameras[i].K = cv::Matx33d::eye();
-    cameras[i].distorsion = cv::Matx<double, 5, 1>::zeros();
- //    ROIs[i] = cv::Rect(0, 0, frame[i].cols, frame[i].rows);
+    cameras[i].K = cv::Matx33f::eye();
+    cameras[i].distorsion = cv::Matx<double, 4, 1>::zeros();
   }
 
   /****************************************************************************/
-  /* Load Aruco board configuration and necessary members                     */
+  /* Load Aruco board configuration and detection data structures             */
   /****************************************************************************/
   square = atof(argv[1]);
   {
@@ -87,14 +86,18 @@ int main(int argc, char *argv[]) {
 
     aruco_marker_map.resize(1024, -1); // in place of hashtable  
     int num_markers = aruco_board_config.size();
-    aruco_board_3f.resize(num_markers);
+    aruco_board_3f.reserve(num_markers);
     std::vector<cv::Point3f> aruco_marker_3f(4);
 
     for (int i = 0; i < num_markers; ++i) {
       aruco_marker_map[aruco_board_config[i].id] = i;
-      for (int j = 0; j < 4; ++j )
+      for (int j = 0; j < 4; ++j ) {      
         aruco_marker_3f[j] = cv::Point3f(aruco_board_config[i][j]) * square;
-      aruco_board_3f[i] = aruco_marker_3f;
+        // aruco_marker_3f[j].x = aruco_board_config[i][j].x * square;
+        // aruco_marker_3f[j].y = aruco_board_config[i][j].y * square;
+        // aruco_marker_3f[j].z = aruco_board_config[i][j].z * square;
+      }
+      aruco_board_3f.push_back(aruco_marker_3f);
     }
   }
 
@@ -102,11 +105,22 @@ int main(int argc, char *argv[]) {
   std::vector<cv::Point3f> aruco_markers_detected_3f;
   std::vector<std::vector<cv::Point2f> > single_rig_detections_2f(num_cameras);
   std::vector<std::vector<cv::Point3f> > single_rig_detections_3f(num_cameras);
-  std::vector<std::vector<std::vector<cv::Point2f> > > all_rig_detections_2f(num_cameras);
-  std::vector<std::vector<std::vector<cv::Point3f> > > all_rig_detections_3f(num_cameras);
+  std::vector<std::vector<std::vector<cv::Point2f> > >
+      all_rig_detections_2f(num_cameras);
+  std::vector<std::vector<std::vector<cv::Point3f> > >
+      all_rig_detections_3f(num_cameras);
 
-  int num_calib = 0;
-  char num_calib_buffer[10];
+  /****************************************************************************/
+  /* Initialize camera calibration data structures                            */
+  /****************************************************************************/
+  std::vector<cv::Mat> Ks(num_cameras, cv::Mat::eye(3,3,CV_64F));
+  std::vector<cv::Mat> Ds(num_cameras, cv::Mat::zeros(4,1,CV_64F));
+  std::vector<std::vector<cv::Mat> > rvecs(num_cameras);
+  std::vector<std::vector<cv::Mat> > tvecs(num_cameras);
+  int flag = cv::fisheye::CALIB_RECOMPUTE_EXTRINSIC ||
+      cv::fisheye::CALIB_CHECK_COND ||
+      cv::fisheye::CALIB_FIX_SKEW;
+  double rms;
 
   /****************************************************************************/
   /* Start reading video stream                                               */
@@ -118,17 +132,24 @@ int main(int argc, char *argv[]) {
 
   bool FOV_intersect;
   char keypress;
+  int num_calib = 0;
+  char num_calib_buffer[10];
+  bool sane = false;
 
   while(video_stream[0].read(frame[0])) {
-    frames = frame[0];
+    // Initalize rig with first camera
+    if (!sane) cameras[0].size = frame[0].size();
     FOV_intersect = DetectArucoMarkers(&(frame[0]),
                                        &aruco_markers_detected_2f,
                                        &aruco_markers_detected_3f);
     single_rig_detections_2f[0] = aruco_markers_detected_2f;
     single_rig_detections_3f[0] = aruco_markers_detected_3f;
+    frames = frame[0];    
 
-    for (int i = 1; i < num_cameras; ++i) {
+    // Read the other cameras
+    for (int i = 1; i < num_cameras; ++i) {      
       video_stream[i].read(frame[i]);  
+      if (!sane) cameras[i].size = frame[i].size();
       FOV_intersect &= DetectArucoMarkers(&(frame[i]),
                                           &aruco_markers_detected_2f,
                                           &aruco_markers_detected_3f);
@@ -136,7 +157,9 @@ int main(int argc, char *argv[]) {
       single_rig_detections_3f[i] = aruco_markers_detected_3f;
       cv::hconcat(frames, frame[i], frames);
     }   
+    if (!sane) sane = true;
 
+    // Display status in window
     sprintf(num_calib_buffer, "%d", num_calib);
     std::string str(num_calib_buffer);
     cv::putText(frames, "# calibration captures = " + str, cv::Point(50, 50),
@@ -144,14 +167,16 @@ int main(int argc, char *argv[]) {
     cv::putText(frames, "# calibration captures = " + str, cv::Point(50, 50),
                 cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 0), 3);
 
+    // Send image to display
     cv::imshow(window_name, frames);
     keypress = cv::waitKey(30);
 
     // Esc key press -- EXIT
     if (keypress == 27) break;
     // SPACEBAR key press -- Collect data
-    if (keypress == 32) {
+    if (keypress == 32) {      
       if (FOV_intersect) {
+        // Aruco markers detected in every camera
         for (int i = 0; i < num_cameras; ++i) {
           all_rig_detections_2f[i].push_back(single_rig_detections_2f[i]);
           all_rig_detections_3f[i].push_back(single_rig_detections_3f[i]);
@@ -166,11 +191,60 @@ int main(int argc, char *argv[]) {
       if (all_rig_detections_2f[0].size() == 0) {
         std::cout << "Cannot calibrate!  No data collected.\n";
       } else {
-        std::cout << "Calibrating from " << num_calib 
-                  << " captured collections.";
+        std::cout << "Calibrating from " << num_calib << " "
+                  << "captured collections.";
+
+        std::cout << "all 3f: num_cameras = " 
+                  << all_rig_detections_3f.size() << std::endl;
+        std::cout << "all 2f: num_cameras = " 
+                  << all_rig_detections_2f.size() << std::endl;
+             
+        //      for ( int i = 0; i < num_cameras; ++i ) {
+          int i = 1;
+          cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
+          // cv::Mat D = cv::Mat::ones(6,1,CV_64F);
+          // std::vector<cv::Mat> rvec;
+          // std::vector<cv::Mat> tvec;       
+          
+          cv::Vec4d D;   
+          std::vector<cv::Vec3f> rvec;
+          std::vector<cv::Vec3f> tvec;
+          
+          std::cout << "camera " << i << " 3f: num_captures = "
+                    << all_rig_detections_3f[i].size() << std::endl;
+          std::cout << "camera " << i << " 2f: num_captures = "
+                    << all_rig_detections_2f[i].size() << std::endl;
+          
+          std::cout << "camera " << i << " imsize = " 
+                    << cameras[i].size << std::endl;
+          std::cout << "camera " << i << " K = " << K << std::endl;
+          std::cout << "camera " << i << " D = " << D << std::endl;
+          std::cout << "camera " << i << " rvecs = " << rvec.size() << std::endl;
+          std::cout << "camera " << i << " tvecs = " << tvec.size() << std::endl;
+          
+          // for (int j = 0; j < all_rig_detections_3f[i].size(); ++j ) {
+          //   std::cout << "capture " << j << " 3f num pts = " 
+          //             << all_rig_detections_3f[i][j].size() << std::endl;
+          //   std::cout << "capture " << j << " 2f num pts = " 
+          //             << all_rig_detections_2f[i][j].size() << std::endl;
+          // }
+          const std::vector<std::vector<cv::Point3f> > &tmp1 = all_rig_detections_3f[i];
+          const std::vector<std::vector<cv::Point2f> > &tmp2 = all_rig_detections_2f[i];
+          
+          rms = cv::fisheye::calibrate(tmp1, tmp2,                                        
+                                    cameras[i].size,
+                                    K, D, rvec, tvec);
+                   
+          std::cout << "hello!\n";
+          std::cout << "camera " << i << " K = " << K << std::endl;
+          std::cout << "camera " << i << " D = " << D << std::endl;
+          std::cout << "camera " << i << " rvecs = " << rvec.size() << std::endl;
+          std::cout << "camera " << i << " tvecs = " << tvec.size() << std::endl;
+          // }
         num_calib = 0;
       }
     }
+    
   }
 
   /****************************************************************************/
@@ -180,6 +254,9 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
+// This function uses the Aruco library to detect any Aruco markers in image *im
+// and collects the corner image locations of the markers detected and the
+// corresponding 3F coordinates from the original board configuration. 
 bool DetectArucoMarkers(
     cv::Mat* im,
     std::vector<cv::Point2f>* aruco_marker_detects_2f,
@@ -197,17 +274,22 @@ bool DetectArucoMarkers(
       return false;
     } else {
       int marker_idx, i_ = 0;
-      aruco_marker_detects_2f->resize(markers.size() * 4);
-      aruco_marker_detects_3f->resize(aruco_marker_detects_2f->size());     
+      aruco_marker_detects_2f->reserve(markers.size() * 4);
+      aruco_marker_detects_3f->reserve(aruco_marker_detects_2f->size());     
+      //      aruco_marker_detects_2f->resize(markers.size() * 4);
+      //      aruco_marker_detects_3f->resize(aruco_marker_detects_2f->size());     
       for (int i = 0; i < markers.size(); ++i) {
         marker_idx = aruco_marker_map[markers[i].id];
         if (marker_idx >=0) {
           if (DRAWMARKERS) markers[i].draw(*im, cv::Scalar(0, 0, 255), 2);
           for (int j = 0; j < 4; ++j) {
-            (*aruco_marker_detects_2f)[i_ + j] =
-              cv::Point2f(markers[i][j]);
-            (*aruco_marker_detects_3f)[i_ + j] =
-              cv::Point3f(aruco_board_3f[aruco_marker_map[markers[i].id]][j]);
+            aruco_marker_detects_2f->push_back(cv::Point2f(markers[i][j].x,
+                                                           markers[i][j].y));
+            aruco_marker_detects_3f->push_back(aruco_board_3f[aruco_marker_map[markers[i].id]][j]);
+            // (*aruco_marker_detects_2f)[i_ + j] =
+            //   cv::Point2f(markers[i][j]);
+            // (*aruco_marker_detects_3f)[i_ + j] =
+            //   cv::Point3f(aruco_board_3f[aruco_marker_map[markers[i].id]][j]);
           }
           i_ = i + 4;
         }
@@ -216,7 +298,8 @@ bool DetectArucoMarkers(
     }
   } else return false;
 }  
-                                                          
+
+// This function normalizes the image intensities over [0, 256)
 void Autobalance(cv::Mat* im) {
   if (!(im == NULL)) {
     double min_px, max_px;
