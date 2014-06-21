@@ -18,14 +18,14 @@ using cv::Ptr;
 using namespace cv;
 using std::string;
 
-static bool WriteVocabulary( const string& filename, const Mat& vocabulary ) {
-    printf("Saving vocabulary...\n");
-    FileStorage fs( filename, FileStorage::WRITE );
-    if( fs.isOpened() ) {
-        fs << "vocabulary" << vocabulary;
-        return true;
-    }
-    return false;
+static bool WriteVocabulary(const string& filename, const Mat& vocabulary) {
+  printf("Saving vocabulary...\n");
+  FileStorage fs(filename, FileStorage::WRITE);
+  if (fs.isOpened()) {
+    fs << "vocabulary" << vocabulary;
+    return true;
+  }
+  return false;
 }
 
 
@@ -35,7 +35,6 @@ static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
   cv::RNG rng(1234);
   Ptr<FeatureDetector> fdetector(new DynamicAdaptedFeatureDetector(
             AdjusterAdapter::create("STAR"), 130, 150, 5));
-  // Ptr<DescriptorExtractor> dextractor(new BriefDescriptorExtractor(32));
   Ptr<DescriptorExtractor> dextractor(new SurfDescriptorExtractor(1000, 4, 2, false, true));
 
   TermCriteria terminate_criterion; 
@@ -44,6 +43,7 @@ static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
 
   for (int i = 0; i < total_frames; i++) {
     Mat vocab_frame;
+    // TODO: Hardcoded prefix
     string frame_filename = vocab_dir + "vocab_%06d.png";
     vocab_frame = cv::imread(cv::format(frame_filename.c_str(), i));
 
@@ -103,12 +103,18 @@ static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
 }
 
 /*
+ Keyboard controls: <ESC>       - quits image capturing mode and starts
+                                  vocabulary tree building 
+                    <SPACE BAR> - saves the image during data collection
+                                - moves to next image while showing
+                                  keypoints and building a vocabulary tree 
  Sample usage:
 
  ./build_vocab_tree [img_save_dir]
 
 arguments:
    img_save_dir -- directory where vocabulary images are saved
+TODO: vocab_file   -- yml file that stores vocabulary
  */
 int main(int argc, char *argv[]) {
   string img_save_dir;
@@ -168,11 +174,6 @@ int main(int argc, char *argv[]) {
     printf("Error: file %s cannot be opened to write\n");
     exit(-1);
   }
-  // build vocabulary tree
-  //
-  // FabMap2 fabmap_obj;
-  // std::vector<cv::Mat> query_img_descriptors;
-  // fabmap_obj.addTraining(query_img_descriptors);
 
   return 0;
 }
