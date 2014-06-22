@@ -52,6 +52,8 @@
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/nonfree/nonfree.hpp"
+#include <boost/filesystem.hpp>
+#include <cstdio>
 
 using namespace cv;
 using namespace std;
@@ -141,16 +143,24 @@ int main(int argc, char * argv[]) {
     bide.setVocabulary(vocab);
 
     vector<string> imageNames;
-    imageNames.push_back(string("stlucia_test_small0000.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0001.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0002.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0003.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0004.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0005.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0006.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0007.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0008.jpeg"));
-    imageNames.push_back(string("stlucia_test_small0009.jpeg"));
+    namespace bfs = boost::filesystem;
+
+    // TODO: Hardcoded path in the build folder
+    bfs::path p("test_images");
+    bfs::directory_iterator end_iter;
+    if (bfs::is_directory(p)) {
+      for (bfs::directory_iterator dir_iter(p); dir_iter != end_iter;
+          ++dir_iter) {
+        if (bfs::is_regular_file(dir_iter->status()) ) {
+          printf("%s\n", dir_iter->path().c_str());
+          imageNames.push_back(dir_iter->path().native());
+        }
+      }
+    }
+
+    std::sort(imageNames.begin(), imageNames.end());
+
+    printf("Number of image files being processed is %d\n", imageNames.size());
 
     Mat testData;
     Mat frame;
@@ -189,7 +199,7 @@ int main(int argc, char * argv[]) {
     fabmap->compare(testData, matches, true);
 
     //display output
-    Mat result_small = Mat::zeros(10, 10, CV_8UC1);
+    Mat result_small = Mat::zeros(imageNames.size(), imageNames.size(), CV_8UC1);
     vector<of2::IMatch>::iterator l;
 
     for(l = matches.begin(); l != matches.end(); l++) {
