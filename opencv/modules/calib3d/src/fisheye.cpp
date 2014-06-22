@@ -40,6 +40,7 @@
 //
 //M*/
 
+#include <iostream>
 #include "precomp.hpp"
 #include "fisheye.hpp"
 
@@ -755,6 +756,7 @@ double cv::fisheye::calibrate(InputArrayOfArrays objectPoints, InputArrayOfArray
     //-------------------------------Optimization
     for(int iter = 0; ; ++iter)
     {
+      std::cout << "Inside optimization " << iter << ": delta = " << change << std::endl;
         if ((criteria.type == 1 && iter >= criteria.maxCount)  ||
             (criteria.type == 2 && change <= criteria.epsilon) ||
             (criteria.type == 3 && (change <= criteria.epsilon || iter >= criteria.maxCount)))
@@ -826,7 +828,7 @@ double cv::fisheye::stereoCalibrate(InputArrayOfArrays objectPoints, InputArrayO
     const double thresh_cond = 1e6;
     const int check_cond = 1;
 
-    int n_points = (int)objectPoints.getMat(0).total();
+    int n_points = (int)objectPoints.getMat(0).total();  //// fixxxxxxxx
     int n_images = (int)objectPoints.total();
 
     double change = 1;
@@ -1359,13 +1361,25 @@ void cv::internal::CalibrateExtrinsics(InputArrayOfArrays objectPoints, InputArr
         imagePoints.getMat (image_idx).convertTo(image, CV_64FC2);
 
         InitExtrinsics(image, object, param, omckk, Tckk);
+        // std::cout << "  CalibrateExt-InitExt: " << std::endl 
+        //           << "  omckk = " << omckk.t() << std::endl
+        //           << "  Tckk = " << Tckk.t() << std::endl;
 
         ComputeExtrinsicRefine(image, object, omckk, Tckk, JJ_kk, maxIter, param, thresh_cond);
         if (check_cond)
         {
             SVD svd(JJ_kk, SVD::NO_UV);
-            CV_Assert(svd.w.at<double>(0) / svd.w.at<double>((int)svd.w.total() - 1) < thresh_cond);
+            //            std::cout << "  CalibrateExt " <<  svd.w.t() << std::endl;
+            //CV_Assert(svd.w.at<double>(0) / svd.w.at<double>((int)svd.w.total() - 1) < thresh_cond);
+            if (!(svd.w.at<double>(0) / svd.w.at<double>((int)svd.w.total() - 1) < thresh_cond))
+              std::cout << "CalibrateExt degenerate " << image_idx << " " 
+                        <<  svd.w.t() << std::endl;
         }
+
+        // std::cout << "  CalibrateExt-Final: " << std::endl 
+        //           << "  omckk = " << omckk.t() << std::endl
+        //           << "  Tckk = " << Tckk.t() << std::endl;
+
         omckk.reshape(3,1).copyTo(omc.getMat().col(image_idx));
         Tckk.reshape(3,1).copyTo(Tc.getMat().col(image_idx));
     }
@@ -1425,7 +1439,11 @@ void cv::internal::ComputeJacobians(InputArrayOfArrays objectPoints, InputArrayO
         {
             Mat JJ_kk = B.t();
             SVD svd(JJ_kk, SVD::NO_UV);
-            CV_Assert(svd.w.at<double>(0) / svd.w.at<double>(svd.w.rows - 1) < thresh_cond);
+            //            std::cout << "Jacobian " << svd.w.t() << std::endl;
+            //CV_Assert(svd.w.at<double>(0) / svd.w.at<double>(svd.w.rows - 1) < thresh_cond);
+            if (!(svd.w.at<double>(0) / svd.w.at<double>(svd.w.rows - 1) < thresh_cond)) 
+              std::cout << "Jacobian degenerate " << image_idx << " "
+                        << svd.w.t() << std::endl;
         }
     }
 
@@ -1446,8 +1464,13 @@ void cv::internal::EstimateUncertainties(InputArrayOfArrays objectPoints, InputA
 
     CV_Assert(!omc.empty() && omc.type() == CV_64FC3);
     CV_Assert(!Tc.empty() && Tc.type() == CV_64FC3);
-
-    Mat ex((int)(objectPoints.getMat(0).total() * objectPoints.total()), 1, CV_64FC2);
+    
+    int totalPts = 0;
+    for (int i = 0; i < (int)objectPoints.total(); ++i) {
+      totalPts += objectPoints.getMat(i).total();
+    }
+    Mat ex(totalPts, 1, CV_64FC2);
+    int i = 0;
 
     for (int image_idx = 0; image_idx < (int)objectPoints.total(); ++image_idx)
     {
@@ -1460,7 +1483,10 @@ void cv::internal::EstimateUncertainties(InputArrayOfArrays objectPoints, InputA
         std::vector<Point2d> x;
         projectPoints(object, x, om, T, params, noArray());
         Mat ex_ = image.t() - Mat(x);
-        ex_.copyTo(ex.rowRange(ex_.rows * image_idx,  ex_.rows * (image_idx + 1)));
+        int j = objectPoints.getMat(image_idx).total();
+
+        ex_.copyTo(ex.rowRange(i, i + j));       
+        i += j;
     }
 
     meanStdDev(ex, noArray(), std_err);
@@ -1609,4 +1635,4 @@ cv::Vec3d cv::internal::median3d(InputArray m)
     CV_Assert(m.depth() == CV_64F && m.getMat().rows == 1);
     Mat M = Mat(m.getMat().t()).reshape(1).t();
     return Vec3d(median(M.row(0)), median(M.row(1)), median(M.row(2)));
-}
+ }
