@@ -1,3 +1,7 @@
+/**
+ * This code takes images, extracts keypoints and descriptors and clusters them into a vocabulary tree
+ */
+
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/contrib/contrib.hpp>
@@ -31,7 +35,8 @@ static bool WriteVocabulary(const string& filename, const Mat& vocabulary) {
 
 static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
     float descriptor_proportion) {
-  const int kvocab_size = 100;
+  //If you have fewer descriptors than kvocab_size, it will crash in kmeans. But, set this appropriately large
+  const int kvocab_size = 100; //Should be large enough to create a rich vocab relative to your data
   cv::RNG rng(1234);
   Ptr<FeatureDetector> fdetector(new DynamicAdaptedFeatureDetector(
             AdjusterAdapter::create("STAR"), 130, 150, 5));
@@ -102,25 +107,35 @@ static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
   return vocabulary; 
 }
 
-/*
- Keyboard controls: <ESC>       - quits image capturing mode and starts
-                                  vocabulary tree building 
-                    <SPACE BAR> - saves the image during data collection
-                                - moves to next image while showing
-                                  keypoints and building a vocabulary tree 
- Sample usage:
+void help()
+{
+	printf("\n"
+" Keyboard controls: <ESC>       - quits image capturing mode and starts\n"
+"                                  vocabulary tree building \n"
+"                    <SPACE BAR> - saves the image during data collection\n"
+"                                - moves to next image while showing\n"
+"                                  keypoints and building a vocabulary tree \n"
+" Sample usage:\n"
+"\n"
+" ./build_vocab_tree [img_save_dir]\n"
+"\n"
+"arguments:\n"
+"   img_save_dir -- directory where vocabulary images are saved\n"
+"TODO: vocab_file   -- yml file that stores vocabulary\n\n"
+);
+}
 
- ./build_vocab_tree [img_save_dir]
-
-arguments:
-   img_save_dir -- directory where vocabulary images are saved
-TODO: vocab_file   -- yml file that stores vocabulary
- */
 int main(int argc, char *argv[]) {
   string img_save_dir;
   if (argc == 1) {
-    img_save_dir = "fabmap/";
+    help();
+    return(0);
   } else if (argc == 2) {
+	  if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help"))
+	  {
+		  help();
+		  return(0);
+	  }
     img_save_dir = string(argv[1]);
     // FIXME: Assumes linux style directory structure
     // need to generalize to windows
@@ -154,8 +169,11 @@ int main(int argc, char *argv[]) {
     cap >> frame;
     imshow("input RGB image", frame);
     int keyp = waitKey(30);
-    if (keyp == 27) {
+    if(keyp == 'h')
+	  help();
+	else if (keyp == 27) {
       printf("Done capturing.\n");
+      
       break;
     } else if (keyp == 32) {
       printf("Saving frame\n");
@@ -165,6 +183,7 @@ int main(int argc, char *argv[]) {
       framenum++;
     }
   }
+  destroyWindow("input RGB image");
 
   const float kdescriptor_proportion = 0.7;
   cv::Mat vocabulary = TrainVocabulary(img_save_dir, framenum - 1, kdescriptor_proportion);

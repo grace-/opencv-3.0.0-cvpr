@@ -1,3 +1,8 @@
+/**
+ * After running build_vocab_tree, this code will turn the resulting descriptors
+ * into a bag of words (BOW)
+ */
+ 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/contrib/contrib.hpp>
@@ -45,17 +50,46 @@ static bool WriteTrainingData(string filename,
   return false;
 }
 
+void help()
+{
+	printf("\n\n"
+	"Usage:\n"
+	"   ./build_training_map <vocab file name> <directory to put logged images into>\n"
+	"\n"
+	"Press space collect each image to put into the map\n"
+	"ESC will end\n"
+	   "\n\n");
+   };
+	
+	
 int main(int argc, char *argv[]) {
   string vocab_file;
   string img_save_dir;
   if (argc == 1) {
-    vocab_file = "vocab_big.yml";
+    help();
+    return 0;
   } else if (argc == 2) {
+	if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help"))
+	  {
+		  help();
+		  return(0);
+	  }
     vocab_file = string(argv[1]);
     img_save_dir = "./";
   } else if (argc == 3) {
     vocab_file = string(argv[1]);
     img_save_dir = string(argv[2]);
+    if (img_save_dir[img_save_dir.length() - 1] != '/') {
+      img_save_dir += "/";
+    }
+    boost::filesystem::path dir(img_save_dir);
+    if (boost::filesystem::exists(dir)) {
+	  printf("Sequence directory already exists. Change dir name. Aborting.\n");
+	  return -1;
+    }
+    if (boost::filesystem::create_directory(dir)) {
+	  printf("Directory '%s' created\n", img_save_dir.c_str());
+    }
   }
 
   cv::Mat vocabulary = LoadVocabFile(vocab_file);
@@ -92,7 +126,11 @@ int main(int argc, char *argv[]) {
     if (keyp == 27) {
       printf("Done capturing.\n");
       break;
-    } else if (keyp == 32) {
+    } else if (keyp == 'h')
+    {
+		help();
+	} 
+    else if (keyp == 32) {
       Mat visualword_descriptor;
       vector<KeyPoint> kpts;
       detector->detect(frame, kpts);
@@ -102,6 +140,7 @@ int main(int argc, char *argv[]) {
 
       printf("Saving frame\n");
       string frame_filename;
+      
       // TODO: Hardcoded prefix
       frame_filename = img_save_dir + "training_%06d.png";
       cv::imwrite(cv::format(frame_filename.c_str(), framenum), frame);

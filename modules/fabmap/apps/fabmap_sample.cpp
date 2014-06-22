@@ -81,15 +81,20 @@ int main(int argc, char * argv[]) {
     cout << "This sample program demonstrates the FAB-MAP image matching "
         "algorithm" << endl << endl;
 
-    string dataDir;
+    string dataDir, mapDir;
     if (argc == 1) {
         dataDir = "fabmap/";
     } else if (argc == 2) {
         dataDir = string(argv[1]);
         dataDir += "/";
-    } else {
+    } else if (argc == 3) {
+		dataDir = string(argv[1]);
+        dataDir += "/";
+		mapDir = string(argv[2]);
+		mapDir += "/";
+	} else {
         //incorrect arguments
-        cout << "Usage: fabmap_sample <sample data directory>" <<
+        cout << "Usage: fabmap_sample <sample data directory> <map data dir>" <<
             endl;
         return -1;
     }
@@ -145,8 +150,7 @@ int main(int argc, char * argv[]) {
     vector<string> imageNames;
     namespace bfs = boost::filesystem;
 
-    // TODO: Hardcoded path in the build folder
-    bfs::path p("test_images");
+    bfs::path p(mapDir);
     bfs::directory_iterator end_iter;
     if (bfs::is_directory(p)) {
       for (bfs::directory_iterator dir_iter(p); dir_iter != end_iter;
@@ -160,7 +164,7 @@ int main(int argc, char * argv[]) {
 
     std::sort(imageNames.begin(), imageNames.end());
 
-    printf("Number of image files being processed is %d\n", imageNames.size());
+    printf("Number of image files being processed is %lu\n", imageNames.size());
 
     Mat testData;
     Mat frame;
