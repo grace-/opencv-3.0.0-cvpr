@@ -98,8 +98,8 @@ int main(int argc, char * argv[]) {
 
     //load/generate vocab
     cout << "Loading Vocabulary: " <<
-        dataDir + string("vocab_small.yml") << endl << endl;
-    fs.open(dataDir + string("vocab_small.yml"), FileStorage::READ);
+        dataDir + string("vocab_big.yml") << endl << endl;
+    fs.open(dataDir + string("vocab_big.yml"), FileStorage::READ);
     Mat vocab;
     fs["Vocabulary"] >> vocab;
     if (vocab.empty()) {
@@ -111,8 +111,8 @@ int main(int argc, char * argv[]) {
     //load/generate training data
 
     cout << "Loading Training Data: " <<
-        dataDir + string("train_data_small.yml") << endl << endl;
-    fs.open(dataDir + string("train_data_small.yml"), FileStorage::READ);
+        dataDir + string("training_data.yml") << endl << endl;
+    fs.open(dataDir + string("training_data.yml"), FileStorage::READ);
     Mat trainData;
     fs["BOWImageDescs"] >> trainData;
     if (trainData.empty()) {
@@ -146,7 +146,7 @@ int main(int argc, char * argv[]) {
     namespace bfs = boost::filesystem;
 
     // TODO: Hardcoded path in the build folder
-    bfs::path p("test_images");
+    bfs::path p("map");
     bfs::directory_iterator end_iter;
     if (bfs::is_directory(p)) {
       for (bfs::directory_iterator dir_iter(p); dir_iter != end_iter;
