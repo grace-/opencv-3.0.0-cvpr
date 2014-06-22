@@ -18,3 +18,6 @@ target_link_libraries(fabmap_sample ${LIB_DEPENDENCIES})
 
 add_executable(log_images log_images.cc)
 target_link_libraries(log_images ${LIB_DEPENDENCIES})
+
+add_executable(live_fabmap live_fabmap.cc)
+target_link_libraries(live_fabmap ${LIB_DEPENDENCIES})
