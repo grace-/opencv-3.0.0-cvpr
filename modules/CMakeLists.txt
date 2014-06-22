@@ -1,2 +1,2 @@
 add_subdirectory(multi_fisheye_calib)
-add_subdirectory(fabmap)
+add_subdirectory(ofabmap)
