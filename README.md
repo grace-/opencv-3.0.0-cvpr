@@ -25,3 +25,5 @@ make -j<# processors to use> install
 ## Apps
 
 ### Multiple fisheye camera calibration
+
+### OpenFabMap sample
