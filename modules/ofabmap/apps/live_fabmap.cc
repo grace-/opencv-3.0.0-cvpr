@@ -87,16 +87,24 @@ int main(int argc, char * argv[]) {
 
     string dataDir, mapDir;
     if (argc == 1) {
-        dataDir = "fabmap/";
+        //incorrect arguments
+        cout << "Usage: live_fabmap <vocab & train yml files directory> <map data dir>" <<
+            endl;
+        return (-1);
     } else if (argc == 2) {
+        if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+            cout << "Usage: live_fabmap <sample data directory> <map data dir>" <<
+                endl;
+            return(-1);
+        }
         dataDir = string(argv[1]);
         dataDir += "/";
     } else if (argc == 3) {
-		dataDir = string(argv[1]);
+	dataDir = string(argv[1]);
         dataDir += "/";
-		mapDir = string(argv[2]);
-		mapDir += "/";
-	} else {
+	mapDir = string(argv[2]);
+	mapDir += "/";
+    } else {
         //incorrect arguments
         cout << "Usage: live_fabmap <sample data directory> <map data dir>" <<
             endl;
@@ -238,7 +246,7 @@ int main(int argc, char * argv[]) {
 
       double max_prob = 0;
       int max_img_idx = -1;
-      // cout << "---------------------" << endl;
+      cout << "---------------------" << endl;
       for (l = matches.begin(); l != matches.end(); l++) {
         cout << "prob is " << l->match << endl;
         if (max_prob < l->match) {
@@ -263,29 +271,5 @@ int main(int argc, char * argv[]) {
 	help();
       }
     }
-   
- #if 0 
-    //display output
-    Mat result_small = Mat::zeros(imageNames.size(), imageNames.size(), CV_8UC1);
-    vector<of2::IMatch>::iterator l;
-
-    for(l = matches.begin(); l != matches.end(); l++) {
-            if(l->imgIdx < 0) {
-                result_small.at<char>(l->queryIdx, l->queryIdx) =
-                    (char)(l->match*255);
-
-            } else {
-                result_small.at<char>(l->queryIdx, l->imgIdx) =
-                    (char)(l->match*255);
-            }
-    }
-
-    Mat result_large(100, 100, CV_8UC1);
-    resize(result_small, result_large, Size(500, 500), 0, 0, CV_INTER_NN);
-
-    cout << endl << "Press any key to exit" << endl;
-    imshow("Confusion Matrix", result_large);
-    waitKey();
-  #endif
     return 0;
 }
