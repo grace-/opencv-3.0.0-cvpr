@@ -169,7 +169,6 @@ int main(int argc, char *argv[]) {
   }
 
   const float kdescriptor_proportion = 0.7;
-  framenum = 38;
   cv::Mat vocabulary = TrainVocabulary(img_save_dir, framenum - 1, kdescriptor_proportion);
   string filename = "vocab_big.yml";
   if (!WriteVocabulary(filename, vocabulary)) {
