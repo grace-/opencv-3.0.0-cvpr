@@ -21,7 +21,7 @@ cv::Mat LoadVocabFile(const std::string &vocab_file) {
   fs.open(vocab_path.c_str(), FileStorage::READ);
 
   Mat vocab;
-  fs["vocabulary"] >> vocab;
+  fs["Vocabulary"] >> vocab;
   if (vocab.empty()) { 
     printf("Vocabulary not found\n");
     return cv::Mat();

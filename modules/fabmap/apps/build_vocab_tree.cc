@@ -22,7 +22,7 @@ static bool WriteVocabulary(const string& filename, const Mat& vocabulary) {
   printf("Saving vocabulary...\n");
   FileStorage fs(filename, FileStorage::WRITE);
   if (fs.isOpened()) {
-    fs << "vocabulary" << vocabulary;
+    fs << "Vocabulary" << vocabulary;
     return true;
   }
   return false;
@@ -135,14 +135,13 @@ int main(int argc, char *argv[]) {
     if (boost::filesystem::create_directory(dir)) {
       printf("Directory '%s' created\n", img_save_dir.c_str());
     }
-
   } else {
     //incorrect arguments
     printf("Usage: build_vocab_tree <img_save_dir>\n");
     return -1; 
   }
 
-  // read images
+  // read images from camera
   cv::VideoCapture cap(1);
   if (!cap.isOpened()) {
     printf("Opening the default camera did not succeed\n"); 
@@ -171,7 +170,7 @@ int main(int argc, char *argv[]) {
   cv::Mat vocabulary = TrainVocabulary(img_save_dir, framenum - 1, kdescriptor_proportion);
   string filename = "vocab_big.yml";
   if (!WriteVocabulary(filename, vocabulary)) {
-    printf("Error: file %s cannot be opened to write\n");
+    printf("Error: file %s cannot be opened to write\n", filename.c_str());
     exit(-1);
   }
 
