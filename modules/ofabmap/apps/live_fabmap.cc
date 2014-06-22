@@ -142,8 +142,9 @@ int main(int argc, char * argv[]) {
         endl;
     Ptr<FeatureDetector> detector =
         new DynamicAdaptedFeatureDetector(
-        AdjusterAdapter::create("STAR"), 130, 150, 5);
+        AdjusterAdapter::create("SURF"), 100, 130, 5);
     Ptr<DescriptorExtractor> extractor =
+        // DescriptorExtractor::create("SIFT");
         new SurfDescriptorExtractor(1000, 4, 2, false, true);
     Ptr<DescriptorMatcher> matcher =
         DescriptorMatcher::create("FlannBased");
@@ -178,8 +179,8 @@ int main(int argc, char * argv[]) {
     vector<Mat> map_images;
 
     for(size_t i = 0; i < imageNames.size(); i++) {
-        cout << dataDir + imageNames[i] << endl;
-        frame = imread(dataDir + imageNames[i]);
+        cout << imageNames[i] << endl;
+        frame = imread(imageNames[i]);
         if(frame.empty()) {
             cerr << "Test images not found" << endl;
             return -1;
@@ -221,11 +222,13 @@ int main(int argc, char * argv[]) {
     for (;;) {
       Mat frame;
       cap >> frame;
-      imshow("input RGB image", frame);
        
       Mat visualword_descriptor;
       vector<KeyPoint> kpts;
       detector->detect(frame, kpts);
+
+      drawKeypoints(frame, kpts, frame);
+      imshow("input RGB image", frame);
       bide.compute(frame, kpts, visualword_descriptor);
  
       vector<of2::IMatch> matches;
@@ -235,7 +238,7 @@ int main(int argc, char * argv[]) {
 
       double max_prob = 0;
       int max_img_idx = -1;
-      cout << "---------------------" << endl;
+      // cout << "---------------------" << endl;
       for (l = matches.begin(); l != matches.end(); l++) {
         cout << "prob is " << l->match << endl;
         if (max_prob < l->match) {
@@ -244,7 +247,7 @@ int main(int argc, char * argv[]) {
         }
       }
 
-      cout << " Max idx is " << max_img_idx << endl;
+      // cout << " Max idx is " << max_img_idx << endl;
       cv::Mat disp_image;
       if (max_img_idx == -1) {
         disp_image = Mat::zeros(frame.rows, frame.cols, CV_8UC3);

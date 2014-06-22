@@ -31,11 +31,13 @@ static bool WriteVocabulary(const string& filename, const Mat& vocabulary) {
 
 static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
     float descriptor_proportion) {
-  const int kvocab_size = 100;
+  const int kvocab_size = 300;
   cv::RNG rng(1234);
   Ptr<FeatureDetector> fdetector(new DynamicAdaptedFeatureDetector(
-            AdjusterAdapter::create("STAR"), 130, 150, 5));
-  Ptr<DescriptorExtractor> dextractor(new SurfDescriptorExtractor(1000, 4, 2, false, true));
+            AdjusterAdapter::create("SURF"), 100, 130, 5));
+  Ptr<DescriptorExtractor> dextractor = 
+    // DescriptorExtractor::create("SIFT");
+    (new SurfDescriptorExtractor(1000, 4, 2, false, true));
 
   TermCriteria terminate_criterion; 
   terminate_criterion.epsilon = FLT_EPSILON;
@@ -167,6 +169,7 @@ int main(int argc, char *argv[]) {
   }
 
   const float kdescriptor_proportion = 0.7;
+  framenum = 38;
   cv::Mat vocabulary = TrainVocabulary(img_save_dir, framenum - 1, kdescriptor_proportion);
   string filename = "vocab_big.yml";
   if (!WriteVocabulary(filename, vocabulary)) {

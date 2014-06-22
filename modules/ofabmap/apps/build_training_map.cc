@@ -100,9 +100,10 @@ int main(int argc, char *argv[]) {
 
   Ptr<FeatureDetector> detector =
     new DynamicAdaptedFeatureDetector(
-      AdjusterAdapter::create("STAR"), 130, 150, 5);
+      AdjusterAdapter::create("SURF"), 100, 130, 5);
   Ptr<DescriptorExtractor> extractor =
-    new SurfDescriptorExtractor(1000, 4, 2, false, true);
+   // DescriptorExtractor::create("SIFT");
+     new SurfDescriptorExtractor(1000, 4, 2, false, true);
   Ptr<DescriptorMatcher> matcher =
     DescriptorMatcher::create("FlannBased");
 
