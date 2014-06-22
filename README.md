@@ -24,6 +24,21 @@ make -j<# processors to use> install
 
 ## Apps
 
+### Install
+Requires system install of Boost.
+````
+sudo apt-get install libboost-all-dev
+
+mkdir build
+cd build
+cmake ..
+make -j<# processors to use>
+````
+
 ### Multiple fisheye camera calibration
+
+````
+build/modules/multi_fisheye_calib/apps/./multi_fisheye_calib
+````
 
 ### OpenFabMap sample
