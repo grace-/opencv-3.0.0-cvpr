@@ -12,7 +12,7 @@
 SET(OpenCV_FOUND false)
 SET(OpenCV_LIBRARIES "")
 
-SET(OpenCV_DIR ../../../opencv/install)
+GET_FILENAME_COMPONENT(OpenCV_DIR ../../../opencv/install REALPATH)
 MESSAGE("-- Looking for OpenCV libraries in " ${OpenCV_DIR})
 
 SET(OpenCV_LIB_DIR ${OpenCV_DIR}/lib)

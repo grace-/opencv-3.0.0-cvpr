@@ -12,6 +12,8 @@
 #include <cstdio>
 #include <map>
 
+#include <aruco_data.h>
+
 void Autobalance(cv::Mat* im);
 bool DetectArucoMarkers(
     cv::Mat* im,
@@ -99,9 +101,10 @@ int main(int argc, char *argv[]) {
   square = atof(argv[1]);
   {
     aruco::BoardConfiguration aruco_board_config;
-    aruco_board_config.readFromFile("../data/aruco20x10_meters.yml");
     //aruco_board_config.readFromFile("../data/aruco6x4_meters.yml");
     // add other board if doing fisheye
+    std::string data_dir(DATA_DIR_PATH);
+    aruco_board_config.readFromFile(data_dir + "/aruco20x10_meters.yml");
 
     int num_markers = aruco_board_config.size();
     aruco_board_3f.reserve(num_markers);
