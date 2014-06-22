@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
               CV_Assert(all_stereo_match_3f[j].size() == imagePoints1[j].size() &&
                         all_stereo_match_3f[j].size() == imagePoints2[j].size());     
             }
-            cv::Mat R = cv::Mat::eye(3, 3, CV_64F), t, E, F;
+            cv::Mat R = cv::Mat::eye(3, 3, CV_64F), t, E, F, om;            
             rms = cv::stereoCalibrate(all_stereo_match_3f,
                                       imagePoints1,
                                       imagePoints2,
@@ -300,9 +300,11 @@ int main(int argc, char *argv[]) {
                                       R, t, E, F,
                                       cv::TermCriteria(cv::TermCriteria::COUNT, 30, 0),
                                       CV_CALIB_FIX_INTRINSIC);
+            cv::Rodrigues(R, om);
             std::cout << "Camera stereo pair (0, " << i << "):" << std::endl
                       << "  R = " << R << std::endl
-                      << "  t = " << t << std::endl
+                      << " om = " << om.t() << std::endl
+                      << "  t = " << t.t() << std::endl
                       << "  rms = " << rms << std::endl;
           }
           
