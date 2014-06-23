@@ -29,7 +29,7 @@ struct Camera {
 
 aruco::MarkerDetector aruco_detector;
 std::map<int, int> aruco_marker_map;
-std::vector<std::vector<cv::Point3f> > aruco_board_3f;
+std::vector<cv::Point3f> aruco_board_3f;
 std::vector<cv::Point3f> aruco_board_pts;
 
 std::vector<std::vector<int> > num_detected_markers;
@@ -107,14 +107,15 @@ int main(int argc, char *argv[]) {
     aruco_board_config.readFromFile(data_dir + "/aruco20x10_meters.yml");
 
     int num_markers = aruco_board_config.size();
-    aruco_board_3f.reserve(num_markers);
-    std::vector<cv::Point3f> aruco_marker_3f(4);
+    aruco_board_3f.reserve(num_markers * 4);
+    //    std::vector<cv::Point3f> aruco_marker_3f(4);
 
     for (int i = 0; i < num_markers; ++i) {
       aruco_marker_map.insert(std::pair<int, int>(aruco_board_config[i].id, i));
       for (int j = 0; j < 4; ++j )
-        aruco_marker_3f[j] = cv::Point3f(aruco_board_config[i][j]) * square;      
-      aruco_board_3f.push_back(aruco_marker_3f);
+        //        aruco_marker_3f[j] = cv::Point3f(aruco_board_config[i][j]) * square;      
+        aruco_board_3f.push_back(cv::Point3f(aruco_board_config[i][j]) * square);
+      //      aruco_board_3f.push_back(aruco_marker_3f);
     }
   }
 
@@ -139,6 +140,10 @@ int main(int argc, char *argv[]) {
   std::vector<cv::Matx<double, 5, 1> > Ds(num_cameras);
   std::vector<std::vector<cv::Mat> > rvecs(num_cameras);
   std::vector<std::vector<cv::Mat> > tvecs(num_cameras);
+  std::vector<cv::Mat> Rs(num_cameras); Rs[0] = cv::Mat::eye(3, 3, CV_64F);
+  std::vector<cv::Mat> Oms(num_cameras); Oms[0] = cv::Mat::zeros(3, 1, CV_64F);
+  std::vector<cv::Mat> Ts(num_cameras); Ts[0] = cv::Mat::zeros(3, 1, CV_64F);
+
   int flag = 0 || 
     cv::fisheye::CALIB_RECOMPUTE_EXTRINSIC ||
     cv::fisheye::CALIB_CHECK_COND ||
@@ -152,9 +157,12 @@ int main(int argc, char *argv[]) {
   cv::namedWindow(window_name, CV_WINDOW_AUTOSIZE); 
   std::string window_name2 = "Undistorted";
   cv::namedWindow(window_name2, CV_WINDOW_AUTOSIZE); 
+  std::string window_name3 = "Board reprojection";
+  cv::namedWindow(window_name3, CV_WINDOW_AUTOSIZE); 
 
-  cv::Mat frames, frames_undistorted, frame_temp;
+  cv::Mat frames, frames_undistorted, frames_reprojected, frame_temp;
   std::vector<cv::Mat> frame(num_cameras);
+  std::vector<cv::Point2f> frame_pts;
 
   bool FOV_intersect;
   char keypress;
@@ -174,8 +182,22 @@ int main(int argc, char *argv[]) {
     single_rig_detections_3f[0] = aruco_markers_detected_3f;
     single_rig_detections_id[0] = aruco_markers_detected_id;
     frames = frame[0];    
-    if (calibrated) cv::undistort(frame[0], frames_undistorted, Ks[0], Ds[0]);
-
+    if (calibrated) {
+      cv::undistort(frame[0], frames_undistorted, Ks[0], Ds[0]);
+      cv::projectPoints(aruco_board_3f, Oms[0], Ts[0], Ks[0], Ds[0], frame_pts);
+      frames_reprojected = frame[0].clone();
+      for (int i = 0; i < aruco_marker_map.size(); ++i) {
+        cv::line(frames_reprojected, frame_pts[i*4], frame_pts[i*4+1],
+                 cv::Scalar(0, 255, 0), 2);
+        cv::line(frames_reprojected, frame_pts[i*4+1], frame_pts[i*4+2],
+                 cv::Scalar(0, 255, 0), 2);
+        cv::line(frames_reprojected, frame_pts[i*4+2], frame_pts[i*4+3],
+                 cv::Scalar(0, 255, 0), 2);
+        cv::line(frames_reprojected, frame_pts[i*4+3], frame_pts[i*4],
+                 cv::Scalar(0, 255, 0), 2);
+      }
+    }
+    
     // Read the other cameras
     for (int i = 1; i < num_cameras; ++i) {      
       video_stream[i].read(frame[i]);  
@@ -190,7 +212,20 @@ int main(int argc, char *argv[]) {
       cv::hconcat(frames, frame[i], frames);
       if (calibrated) {
         cv::undistort(frame[i], frame_temp, Ks[i], Ds[i]);
-        cv::hconcat(frames_undistorted, frame_temp, frames_undistorted);
+        cv::hconcat(frames_undistorted, frame_temp, frames_undistorted); 
+        cv::projectPoints(aruco_board_3f, Oms[i], Ts[i], Ks[i], Ds[i], frame_pts);
+        frame_temp = frame[i].clone();
+        for (int i = 0; i < aruco_marker_map.size(); ++i) {
+          cv::line(frames_reprojected, frame_pts[i*4], frame_pts[i*4+1],
+                   cv::Scalar(0, 255, 0), 2);
+          cv::line(frames_reprojected, frame_pts[i*4+1], frame_pts[i*4+2],
+                   cv::Scalar(0, 255, 0), 2);
+          cv::line(frames_reprojected, frame_pts[i*4+2], frame_pts[i*4+3],
+                   cv::Scalar(0, 255, 0), 2);
+          cv::line(frames_reprojected, frame_pts[i*4+3], frame_pts[i*4],
+                   cv::Scalar(0, 255, 0), 2);
+        }
+        cv::hconcat(frames_reprojected, frame_temp, frames_reprojected);
       }
     }   
     if (!sane) sane = true;
@@ -212,7 +247,10 @@ int main(int argc, char *argv[]) {
 
     // Send image to display
     cv::imshow(window_name, frames);
-    if (calibrated) cv::imshow(window_name2, frames_undistorted);
+    if (calibrated) {
+      cv::imshow(window_name2, frames_undistorted);
+      cv::imshow(window_name3, frames_reprojected);
+    }
     keypress = cv::waitKey(30);
 
     // Esc key press -- EXIT
@@ -272,7 +310,8 @@ int main(int argc, char *argv[]) {
                 if (found) {
                   stereo_match_idx.push_back(std::pair<int, int>(all_stereo_board_map[j].find(marker_id)->second, k));             
                   for (int l = 0; l < 1; ++l) 
-                    stereo_match_3f.push_back(aruco_board_3f[aruco_marker_map.find(marker_id)->second][l]);
+                    //                    stereo_match_3f.push_back(aruco_board_3f[aruco_marker_map.find(marker_id)->second][l]);
+                    stereo_match_3f.push_back(aruco_board_3f[aruco_marker_map.find(marker_id)->second * 4 + l]);
                 }
               }
               all_stereo_match_idx.push_back(stereo_match_idx);
@@ -293,21 +332,21 @@ int main(int argc, char *argv[]) {
               CV_Assert(all_stereo_match_3f[j].size() == imagePoints1[j].size() &&
                         all_stereo_match_3f[j].size() == imagePoints2[j].size());     
             }
-            cv::Mat R = cv::Mat::eye(3, 3, CV_64F), t, E, F, om;            
+            cv::Mat E, F;            
             rms = cv::stereoCalibrate(all_stereo_match_3f,
                                       imagePoints1,
                                       imagePoints2,
                                       Ks[0], Ds[0], 
                                       Ks[i], Ds[i],
                                       cameras[i].size, 
-                                      R, t, E, F,
+                                      Rs[i], Ts[i], E, F,
                                       cv::TermCriteria(cv::TermCriteria::COUNT, 30, 0),
                                       CV_CALIB_FIX_INTRINSIC);
-            cv::Rodrigues(R, om);
+            cv::Rodrigues(Rs[i], Oms[i]);
             std::cout << "Camera stereo pair (0, " << i << "):" << std::endl
-                      << "  R = " << R << std::endl
-                      << " om = " << om.t() << std::endl
-                      << "  t = " << t.t() << std::endl
+                      << "  R = " << Rs[i] << std::endl
+                      << " om = " << Oms[i].t() << std::endl
+                      << "  t = " << Ts[i].t() << std::endl
                       << "  rms = " << rms << std::endl;
           }
           
@@ -404,7 +443,8 @@ bool DetectArucoMarkers(
           for (int j = 0; j < 4; ++j) {
             aruco_marker_detects_2f->push_back(cv::Point2f(markers[i][j].x,
                                                            markers[i][j].y));
-            aruco_marker_detects_3f->push_back(aruco_board_3f[marker_idx][j]);
+            //            aruco_marker_detects_3f->push_back(aruco_board_3f[marker_idx][j]);
+            aruco_marker_detects_3f->push_back(aruco_board_3f[marker_idx * 4 + j]);
           }
         }
       }
