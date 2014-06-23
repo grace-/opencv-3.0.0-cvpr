@@ -30,7 +30,6 @@ struct Camera {
 aruco::MarkerDetector aruco_detector;
 std::map<int, int> aruco_marker_map;
 std::vector<cv::Point3f> aruco_board_3f;
-std::vector<cv::Point3f> aruco_board_pts;
 
 std::vector<std::vector<int> > num_detected_markers;
 std::vector<std::vector<std::vector<cv::Point2f> > > marker_pnts_;
@@ -95,6 +94,13 @@ int main(int argc, char *argv[]) {
   }
   std::cout << std::endl;
 
+  // Totem
+  std::vector<cv::Point3f> gnomon;
+  gnomon.push_back(cv::Point3f(0, 0, 0));
+  gnomon.push_back(cv::Point3f(1, 0, 0));
+  gnomon.push_back(cv::Point3f(0, 1, 0));
+  gnomon.push_back(cv::Point3f(0, 0, 1));
+
   /****************************************************************************/
   /* Load Aruco board configuration and detection data structures             */
   /****************************************************************************/
@@ -154,6 +160,8 @@ int main(int argc, char *argv[]) {
   cv::namedWindow(window_name, CV_WINDOW_AUTOSIZE); 
   std::string window_name2 = "Undistorted";
   cv::namedWindow(window_name2, CV_WINDOW_AUTOSIZE); 
+  std::string window_name3 = "Gnomon";
+  //  cv::namedWindow(window_name3, CV_WINDOW_AUTOSIZE); 
 
   cv::Mat frames, frames_undistorted, frames_reprojected, frame_temp;
   std::vector<cv::Mat> frame(num_cameras);
@@ -169,6 +177,7 @@ int main(int argc, char *argv[]) {
   while(video_stream[0].read(frame[0])) {
     // Initalize rig with first camera
     if (!sane) cameras[0].size = frame[0].size();
+    frame_temp = frame[0].clone();
     FOV_intersect = DetectArucoMarkers(&(frame[0]),
                                        &aruco_markers_detected_2f,
                                        &aruco_markers_detected_3f,
@@ -178,8 +187,28 @@ int main(int argc, char *argv[]) {
     single_rig_detections_id[0] = aruco_markers_detected_id;
     frames = frame[0];    
     if (calibrated) {
+      // if (aruco_markers_detected_3f.size() > 0) {
+      //   cv::Mat R, T;        
+      //   std::vector<cv::Point3f> temp1;
+      //   std::vector<cv::Point2f> temp2;
+      //   for (int k = 0; k < 4; ++k ) {
+      //     temp1.push_back(aruco_markers_detected_3f[k]);
+      //     temp2.push_back(aruco_markers_detected_2f[k]);
+      //   }
+      //   cv::solvePnP(temp1, temp2,
+      //                Ks[0], Ds[0], 
+      //                R, T, false, CV_P3P);
+      //   std::vector<cv::Point2f> imgPts;     
+        
+      //   cv::projectPoints(gnomon, R, T, Ks[0], Ds[0], imgPts);
+      //   std::cout << R << std::endl;
+      //   std::cout << T << std::endl;
+      //   frames_reprojected = frame_temp.clone();
+      //   cv::line(frames_reprojected, imgPts[0], imgPts[1], cv::Scalar(0, 0, 255), 2);
+      //   cv::line(frames_reprojected, imgPts[0], imgPts[2], cv::Scalar(0, 255, 0), 2);
+      //   cv::line(frames_reprojected, imgPts[0], imgPts[3], cv::Scalar(255, 0, 0), 2);      
+      // }
       cv::undistort(frame[0], frames_undistorted, Ks[0], Ds[0]);
-      cv::projectPoints(aruco_board_3f, Oms[0], Ts[0], Ks[0], Ds[0], frame_pts);
     }
     
     // Read the other cameras
@@ -218,8 +247,10 @@ int main(int argc, char *argv[]) {
 
     // Send image to display
     cv::imshow(window_name, frames);
-    if (calibrated)
+    if (calibrated) {
       cv::imshow(window_name2, frames_undistorted);
+      //      cv::imshow(window_name3, frames_reprojected);
+    }
     keypress = cv::waitKey(30);
 
     // Esc key press -- EXIT
@@ -248,7 +279,6 @@ int main(int argc, char *argv[]) {
                   << "captured collections.\n";
      
         for (int i = 0; i < num_cameras; ++i) {
-          Ds[i] = cv::Matx<double, 5, 1>::zeros();
           rms = cv::calibrateCamera(all_rig_detections_3f[i],
                                     all_rig_detections_2f[i],
                                     cameras[i].size,
@@ -277,7 +307,7 @@ int main(int argc, char *argv[]) {
                 int marker_id = all_rig_detections_id[i][j][k];
                 int found = all_stereo_board_map[j].count(marker_id);
                 if (found) {
-                  stereo_match_idx.push_back(std::pair<int, int>(all_stereo_board_map[j].find(marker_id)->second, k));             
+                  stereo_match_idx.push_back(std::pair<int, int>(all_stereo_board_map[j].find(marker_id)->second, k));
                   for (int l = 0; l < 4; ++l) 
                     stereo_match_3f.push_back(aruco_board_3f[aruco_marker_map.find(marker_id)->second * 4 + l]);
                 }
@@ -325,8 +355,7 @@ int main(int argc, char *argv[]) {
         }
         num_calib = 0;
       }
-    }
-    
+    }    
   }
 
   /****************************************************************************/
@@ -369,7 +398,6 @@ bool DetectArucoMarkers(
           for (int j = 0; j < 4; ++j) {
             aruco_marker_detects_2f->push_back(cv::Point2f(markers[i][j].x,
                                                            markers[i][j].y));
-            //            aruco_marker_detects_3f->push_back(aruco_board_3f[marker_idx][j]);
             aruco_marker_detects_3f->push_back(aruco_board_3f[marker_idx * 4 + j]);
           }
         }
