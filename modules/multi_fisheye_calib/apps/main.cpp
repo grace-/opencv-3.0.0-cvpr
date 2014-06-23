@@ -108,14 +108,11 @@ int main(int argc, char *argv[]) {
 
     int num_markers = aruco_board_config.size();
     aruco_board_3f.reserve(num_markers * 4);
-    //    std::vector<cv::Point3f> aruco_marker_3f(4);
 
     for (int i = 0; i < num_markers; ++i) {
       aruco_marker_map.insert(std::pair<int, int>(aruco_board_config[i].id, i));
       for (int j = 0; j < 4; ++j )
-        //        aruco_marker_3f[j] = cv::Point3f(aruco_board_config[i][j]) * square;      
         aruco_board_3f.push_back(cv::Point3f(aruco_board_config[i][j]) * square);
-      //      aruco_board_3f.push_back(aruco_marker_3f);
     }
   }
 
@@ -157,8 +154,6 @@ int main(int argc, char *argv[]) {
   cv::namedWindow(window_name, CV_WINDOW_AUTOSIZE); 
   std::string window_name2 = "Undistorted";
   cv::namedWindow(window_name2, CV_WINDOW_AUTOSIZE); 
-  std::string window_name3 = "Board reprojection";
-  cv::namedWindow(window_name3, CV_WINDOW_AUTOSIZE); 
 
   cv::Mat frames, frames_undistorted, frames_reprojected, frame_temp;
   std::vector<cv::Mat> frame(num_cameras);
@@ -185,17 +180,6 @@ int main(int argc, char *argv[]) {
     if (calibrated) {
       cv::undistort(frame[0], frames_undistorted, Ks[0], Ds[0]);
       cv::projectPoints(aruco_board_3f, Oms[0], Ts[0], Ks[0], Ds[0], frame_pts);
-      frames_reprojected = frame[0].clone();
-      for (int i = 0; i < aruco_marker_map.size(); ++i) {
-        cv::line(frames_reprojected, frame_pts[i*4], frame_pts[i*4+1],
-                 cv::Scalar(0, 255, 0), 2);
-        cv::line(frames_reprojected, frame_pts[i*4+1], frame_pts[i*4+2],
-                 cv::Scalar(0, 255, 0), 2);
-        cv::line(frames_reprojected, frame_pts[i*4+2], frame_pts[i*4+3],
-                 cv::Scalar(0, 255, 0), 2);
-        cv::line(frames_reprojected, frame_pts[i*4+3], frame_pts[i*4],
-                 cv::Scalar(0, 255, 0), 2);
-      }
     }
     
     // Read the other cameras
@@ -213,19 +197,6 @@ int main(int argc, char *argv[]) {
       if (calibrated) {
         cv::undistort(frame[i], frame_temp, Ks[i], Ds[i]);
         cv::hconcat(frames_undistorted, frame_temp, frames_undistorted); 
-        cv::projectPoints(aruco_board_3f, Oms[i], Ts[i], Ks[i], Ds[i], frame_pts);
-        frame_temp = frame[i].clone();
-        for (int i = 0; i < aruco_marker_map.size(); ++i) {
-          cv::line(frames_reprojected, frame_pts[i*4], frame_pts[i*4+1],
-                   cv::Scalar(0, 255, 0), 2);
-          cv::line(frames_reprojected, frame_pts[i*4+1], frame_pts[i*4+2],
-                   cv::Scalar(0, 255, 0), 2);
-          cv::line(frames_reprojected, frame_pts[i*4+2], frame_pts[i*4+3],
-                   cv::Scalar(0, 255, 0), 2);
-          cv::line(frames_reprojected, frame_pts[i*4+3], frame_pts[i*4],
-                   cv::Scalar(0, 255, 0), 2);
-        }
-        cv::hconcat(frames_reprojected, frame_temp, frames_reprojected);
       }
     }   
     if (!sane) sane = true;
@@ -247,10 +218,8 @@ int main(int argc, char *argv[]) {
 
     // Send image to display
     cv::imshow(window_name, frames);
-    if (calibrated) {
+    if (calibrated)
       cv::imshow(window_name2, frames_undistorted);
-      cv::imshow(window_name3, frames_reprojected);
-    }
     keypress = cv::waitKey(30);
 
     // Esc key press -- EXIT
@@ -309,8 +278,7 @@ int main(int argc, char *argv[]) {
                 int found = all_stereo_board_map[j].count(marker_id);
                 if (found) {
                   stereo_match_idx.push_back(std::pair<int, int>(all_stereo_board_map[j].find(marker_id)->second, k));             
-                  for (int l = 0; l < 1; ++l) 
-                    //                    stereo_match_3f.push_back(aruco_board_3f[aruco_marker_map.find(marker_id)->second][l]);
+                  for (int l = 0; l < 4; ++l) 
                     stereo_match_3f.push_back(aruco_board_3f[aruco_marker_map.find(marker_id)->second * 4 + l]);
                 }
               }
@@ -324,7 +292,7 @@ int main(int argc, char *argv[]) {
             for (int j = 0; j < all_stereo_match_idx.size(); ++j) {
               for (int k = 0; k < all_stereo_match_idx[j].size(); ++k) {
                 const std::pair<int, int> &stereo_pair = all_stereo_match_idx[j][k];
-                for (int l = 0; l < 1; ++l) {
+                for (int l = 0; l < 4; ++l) {
                   imagePoints1[j].push_back(all_rig_detections_2f[0][j][stereo_pair.first * 4 + l]);
                   imagePoints2[j].push_back(all_rig_detections_2f[i][j][stereo_pair.second * 4 + l]);
                 }
@@ -348,50 +316,8 @@ int main(int argc, char *argv[]) {
                       << " om = " << Oms[i].t() << std::endl
                       << "  t = " << Ts[i].t() << std::endl
                       << "  rms = " << rms << std::endl;
-          }
-          
+          }          
         }
-        //   int i = 1;
-        //   cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
-        //   // cv::Mat D = cv::Mat::ones(6,1,CV_64F);
-        //   // std::vector<cv::Mat> rvec;
-        //   // std::vector<cv::Mat> tvec;       
-          
-        //   cv::Vec4d D;   
-        //   std::vector<cv::Vec3f> rvec;
-        //   std::vector<cv::Vec3f> tvec;
-          
-        //   std::cout << "camera " << i << " 3f: num_captures = "
-        //             << all_rig_detections_3f[i].size() << std::endl;
-        //   std::cout << "camera " << i << " 2f: num_captures = "
-        //             << all_rig_detections_2f[i].size() << std::endl;
-          
-        //   std::cout << "camera " << i << " imsize = " 
-        //             << cameras[i].size << std::endl;
-        //   std::cout << "camera " << i << " K = " << K << std::endl;
-        //   std::cout << "camera " << i << " D = " << D << std::endl;
-        //   std::cout << "camera " << i << " rvecs = " << rvec.size() << std::endl;
-        //   std::cout << "camera " << i << " tvecs = " << tvec.size() << std::endl;
-          
-        //   // for (int j = 0; j < all_rig_detections_3f[i].size(); ++j ) {
-        //   //   std::cout << "capture " << j << " 3f num pts = " 
-        //   //             << all_rig_detections_3f[i][j].size() << std::endl;
-        //   //   std::cout << "capture " << j << " 2f num pts = " 
-        //   //             << all_rig_detections_2f[i][j].size() << std::endl;
-        //   // }
-        //   const std::vector<std::vector<cv::Point3f> > &tmp1 = all_rig_detections_3f[i];
-        //   const std::vector<std::vector<cv::Point2f> > &tmp2 = all_rig_detections_2f[i];
-          
-        //   rms = cv::fisheye::calibrate(tmp1, tmp2,                                        
-        //                             cameras[i].size,
-        //                             K, D, rvec, tvec);
-                   
-        //   std::cout << "hello!\n";
-        //   std::cout << "camera " << i << " K = " << K << std::endl;
-        //   std::cout << "camera " << i << " D = " << D << std::endl;
-        //   std::cout << "camera " << i << " rvecs = " << rvec.size() << std::endl;
-        //   std::cout << "camera " << i << " tvecs = " << tvec.size() << std::endl;
-        //   // }
         for (int i = 0; i < num_cameras; ++i) {
           all_rig_detections_3f[i].clear();
           all_rig_detections_2f[i].clear();
