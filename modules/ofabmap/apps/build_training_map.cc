@@ -9,13 +9,14 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/features2d.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <cstdio>
 
 using namespace cv;
 using std::string;
 
-cv::Mat LoadVocabFile(const std::string &vocab_file) {
+static cv::Mat LoadVocabFile(const std::string &vocab_file) {
   //Hardcoded vocab data dir
   string data_dir = "./";
   string vocab_path = data_dir + vocab_file; 
@@ -50,47 +51,57 @@ static bool WriteTrainingData(string filename,
   return false;
 }
 
-void help()
+static void help()
 {
-	printf("\n\n"
-	"Usage:\n"
-	"   ./build_training_map <vocab file name> <directory to put logged images into>\n"
-	"\n"
-	"Press space collect each image to put into the map\n"
-	"ESC will end\n"
-	   "\n\n");
-   };
-	
-	
+  printf("\n\n"
+  "Usage:\n"
+  "   ./build_training_map <vocab file name> <directory to put logged images into> [<camera device-id>]\n"
+  "<camera device-id> is optional - should be a non-negative integer. default camera is zero"
+  "\n"
+  "Press space collect each image to put into the map\n"
+  "ESC will end\n"
+     "\n\n");
+}
+
+static void make_img_directory(string *img_save_dir) {
+  if ((*img_save_dir)[img_save_dir->length() - 1] != '/') {
+      *img_save_dir += "/";
+    }
+    boost::filesystem::path dir(*img_save_dir);
+    if (boost::filesystem::exists(dir)) {
+	  printf("Sequence directory already exists. Change dir name. Aborting.\n");
+	  exit(-1);
+    }
+    if (boost::filesystem::create_directory(dir)) {
+	  printf("Directory '%s' created\n", img_save_dir->c_str());
+    }
+}
+
 int main(int argc, char *argv[]) {
   string vocab_file;
   string img_save_dir;
+  int cam_deviceid = 0;
   if (argc == 1) {
     help();
     return 0;
   } else if (argc == 2) {
-	if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help"))
-	  {
-		  help();
-		  return(0);
-	  }
+    if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+      help();
+      return(0);
+    }
     vocab_file = string(argv[1]);
     img_save_dir = "./";
   } else if (argc == 3) {
     vocab_file = string(argv[1]);
     img_save_dir = string(argv[2]);
-    if (img_save_dir[img_save_dir.length() - 1] != '/') {
-      img_save_dir += "/";
-    }
-    boost::filesystem::path dir(img_save_dir);
-    if (boost::filesystem::exists(dir)) {
-	  printf("Sequence directory already exists. Change dir name. Aborting.\n");
-	  return -1;
-    }
-    if (boost::filesystem::create_directory(dir)) {
-	  printf("Directory '%s' created\n", img_save_dir.c_str());
-    }
+    make_img_directory(&img_save_dir);
+  } else if (argc == 4) {
+    vocab_file = string(argv[1]);
+    img_save_dir = string(argv[2]);
+    make_img_directory(&img_save_dir);
+    cam_deviceid = boost::lexical_cast<int>(argv[3]);
   }
+
 
   cv::Mat vocabulary = LoadVocabFile(vocab_file);
   if (vocabulary.empty()) {
@@ -112,7 +123,7 @@ int main(int argc, char *argv[]) {
   vector<Mat> visualword_training;
 
   // read images from camera
-  cv::VideoCapture cap(1);
+  cv::VideoCapture cap(cam_deviceid);
   if (!cap.isOpened()) {
     printf("Opening the default camera did not succeed\n");
     return -1;
