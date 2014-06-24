@@ -1,6 +1,8 @@
 #include <opencv2/opencv.hpp>
+#include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 #include <aruco/aruco.h>
 
@@ -38,6 +40,7 @@ std::vector<std::vector<cv::Mat> > rvecs_;
 std::vector<std::vector<cv::Mat> > tvecs_;
 
 float square;
+bool live;
 
 bool AUTOBALANCE = true;
 bool DRAWMARKERS = true;
@@ -68,31 +71,60 @@ int main(int argc, char *argv[]) {
   /* Initialize video streams and camera objects                              */
   /****************************************************************************/
   int num_cameras;
-  if (argc == 5) num_cameras = atoi(argv[4]);
-  else num_cameras = 1;
+  
+  std::string input(argv[3]);
+  if (input.size() == 1) {
+    live = true;
+    if (argc == 5) num_cameras = atoi(argv[4]);
+    else num_cameras = 1;
+  } else {
+    live = false;
+    num_cameras = 1;
+  }
+
+  num_cameras = 2;
 
   std::vector<cv::VideoCapture> video_stream(num_cameras);
   std::vector<Camera> cameras(num_cameras);
   std::vector<int> video_num(num_cameras);   
-  video_num[0] = atoi(argv[3]);
-
-  for (int i = 0; i < num_cameras; ++i) {
+  if (live)
+    video_num[0] = atoi(argv[3]);
+  else
+    video_num[0] = -1;
+  
+  for (int i = 0; i < 1; ++i) {
     video_num[i] = video_num[0] + i;
-    video_stream[i].open(CV_CAP_FIREWIRE + video_num[i]);  
+    if (live)
+      video_stream[i].open(CV_CAP_FIREWIRE + video_num[i]);  
+    else
+      video_stream[i].open(input);
     video_stream[i].set(CV_CAP_PROP_RECTIFICATION, 1);
     video_stream[i].set(CV_CAP_PROP_FPS, 10);
-    if (!video_stream[i].isOpened()) {
-      std::cerr << "Cannot open firewire video stream: "
-                << video_num[i] << std::endl << std::endl;
-      return -1;
+    if (live) {
+      if (!video_stream[i].isOpened()) {
+        std::cerr << "Cannot open firewire video stream: "
+                  << video_num[i] << std::endl << std::endl;
+        return -1;
+      } else {
+        std::cout << "Video stream /dev/fw" << video_num[i] << " opened.\n";
+      }
     } else {
-      std::cout << "Video stream /dev/fw" << video_num[i] << " opened.\n";
+      if (!video_stream[i].isOpened()) {
+        std::cerr << "Cannot open video file: "
+                  << input << std::endl << std::endl;
+        return -1;
+      } else {
+        std::cout << "Video file " << input << " opened.\n";
+      }
     }
-    cameras[i].size = cv::Size(0, 0);
+    cameras[i].size = cv::Size(640, 400);
     cameras[i].K = cv::Matx33f::eye();
     cameras[i].distorsion = cv::Matx<double, 4, 1>::zeros();
   }
   std::cout << std::endl;
+
+  cameras[0].size = cv::Size(640, 400);
+  cameras[1].size = cv::Size(640, 400);
 
   // Totem
   std::vector<cv::Point3f> gnomon;
@@ -100,6 +132,8 @@ int main(int argc, char *argv[]) {
   gnomon.push_back(cv::Point3f(1, 0, 0));
   gnomon.push_back(cv::Point3f(0, 1, 0));
   gnomon.push_back(cv::Point3f(0, 0, 1));
+
+  num_cameras = 2;
 
   /****************************************************************************/
   /* Load Aruco board configuration and detection data structures             */
@@ -110,7 +144,8 @@ int main(int argc, char *argv[]) {
     //aruco_board_config.readFromFile("../data/aruco6x4_meters.yml");
     // add other board if doing fisheye
     std::string data_dir(DATA_DIR_PATH);
-    aruco_board_config.readFromFile(data_dir + "/aruco20x10_meters.yml");
+    //    aruco_board_config.readFromFile(data_dir + "/aruco20x10_meters.yml");
+    aruco_board_config.readFromFile(data_dir + "/aruco14x8.yml");
 
     int num_markers = aruco_board_config.size();
     aruco_board_3f.reserve(num_markers * 4);
@@ -160,10 +195,8 @@ int main(int argc, char *argv[]) {
   cv::namedWindow(window_name, CV_WINDOW_AUTOSIZE); 
   std::string window_name2 = "Undistorted";
   cv::namedWindow(window_name2, CV_WINDOW_AUTOSIZE); 
-  std::string window_name3 = "Gnomon";
-  //  cv::namedWindow(window_name3, CV_WINDOW_AUTOSIZE); 
 
-  cv::Mat frames, frames_undistorted, frames_reprojected, frame_temp;
+  cv::Mat frames, frames_undistorted, frames_reprojected, frame_temp, frame_from_file;
   std::vector<cv::Mat> frame(num_cameras);
   std::vector<cv::Point2f> frame_pts;
 
@@ -174,62 +207,42 @@ int main(int argc, char *argv[]) {
   bool sane = false;
   bool calibrated = false;
 
-  while(video_stream[0].read(frame[0])) {
-    // Initalize rig with first camera
-    if (!sane) cameras[0].size = frame[0].size();
-    frame_temp = frame[0].clone();
-    FOV_intersect = DetectArucoMarkers(&(frame[0]),
+  cv::Size video_size = cv::Size(1280,800);
+  cv::Mat frame1, frame2;
+  
+  while(video_stream[0].read(frame_from_file)) { 
+
+    frame_from_file(cv::Rect(0,0,1280,800)).copyTo(frame1);
+    frame_from_file(cv::Rect(0,800,1280,800)).copyTo(frame2);
+
+    cv::resize(frame1, frame1, cv::Size(), 0.5, 0.5);
+    cv::resize(frame2, frame2, cv::Size(), 0.5, 0.5);
+    
+    FOV_intersect = DetectArucoMarkers(&(frame1),
                                        &aruco_markers_detected_2f,
                                        &aruco_markers_detected_3f,
                                        &aruco_markers_detected_id);
     single_rig_detections_2f[0] = aruco_markers_detected_2f;
     single_rig_detections_3f[0] = aruco_markers_detected_3f;
     single_rig_detections_id[0] = aruco_markers_detected_id;
-    frames = frame[0];    
+
+    FOV_intersect = DetectArucoMarkers(&(frame2),
+                                       &aruco_markers_detected_2f,
+                                       &aruco_markers_detected_3f,
+                                       &aruco_markers_detected_id);
+    single_rig_detections_2f[1] = aruco_markers_detected_2f;
+    single_rig_detections_3f[1] = aruco_markers_detected_3f;
+    single_rig_detections_id[1] = aruco_markers_detected_id;
+    
+    hconcat(frame1, frame2, frames);
+
     if (calibrated) {
-      // if (aruco_markers_detected_3f.size() > 0) {
-      //   cv::Mat R, T;        
-      //   std::vector<cv::Point3f> temp1;
-      //   std::vector<cv::Point2f> temp2;
-      //   for (int k = 0; k < 4; ++k ) {
-      //     temp1.push_back(aruco_markers_detected_3f[k]);
-      //     temp2.push_back(aruco_markers_detected_2f[k]);
-      //   }
-      //   cv::solvePnP(temp1, temp2,
-      //                Ks[0], Ds[0], 
-      //                R, T, false, CV_P3P);
-      //   std::vector<cv::Point2f> imgPts;     
-        
-      //   cv::projectPoints(gnomon, R, T, Ks[0], Ds[0], imgPts);
-      //   std::cout << R << std::endl;
-      //   std::cout << T << std::endl;
-      //   frames_reprojected = frame_temp.clone();
-      //   cv::line(frames_reprojected, imgPts[0], imgPts[1], cv::Scalar(0, 0, 255), 2);
-      //   cv::line(frames_reprojected, imgPts[0], imgPts[2], cv::Scalar(0, 255, 0), 2);
-      //   cv::line(frames_reprojected, imgPts[0], imgPts[3], cv::Scalar(255, 0, 0), 2);      
-      // }
-      cv::undistort(frame[0], frames_undistorted, Ks[0], Ds[0]);
+      cv::undistort(frame1, frames_undistorted, Ks[0], Ds[0]);
+      cv::undistort(frame2, frame_temp, Ks[1], Ds[1]);
+      hconcat(frames_undistorted, frame_temp, frames_undistorted);
     }
     
-    // Read the other cameras
-    for (int i = 1; i < num_cameras; ++i) {      
-      video_stream[i].read(frame[i]);  
-      if (!sane) cameras[i].size = frame[i].size();
-      FOV_intersect = DetectArucoMarkers(&(frame[i]),
-                                         &aruco_markers_detected_2f,
-                                         &aruco_markers_detected_3f,
-                                         &aruco_markers_detected_id);
-      single_rig_detections_2f[i] = aruco_markers_detected_2f;
-      single_rig_detections_3f[i] = aruco_markers_detected_3f;
-      single_rig_detections_id[i] = aruco_markers_detected_id;
-      cv::hconcat(frames, frame[i], frames);
-      if (calibrated) {
-        cv::undistort(frame[i], frame_temp, Ks[i], Ds[i]);
-        cv::hconcat(frames_undistorted, frame_temp, frames_undistorted); 
-      }
-    }   
     if (!sane) sane = true;
-
     // Display status in window
     sprintf(num_calib_buffer, "%d", num_calib);
     std::string str(num_calib_buffer);    
