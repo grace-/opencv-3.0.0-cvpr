@@ -8,6 +8,7 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/features2d.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <cstdio>
 
@@ -109,6 +110,23 @@ static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
   return vocabulary; 
 }
 
+// directory creation utility function
+static void make_img_directory(string *img_save_dir) {
+  // FIXME: Assumes linux style directory structure
+  // need to generalize to windows
+  if ((*img_save_dir)[img_save_dir->length() - 1] != '/') {
+    *img_save_dir += "/";
+  }
+  boost::filesystem::path dir(*img_save_dir);
+  if (boost::filesystem::exists(dir)) {
+    printf("Sequence directory already exists. Change dir name. Aborting. \n");
+    exit(-1);
+  }
+  if (boost::filesystem::create_directory(dir)) {
+    printf("Directory '%s' created\n", img_save_dir->c_str());
+  }
+}
+
 void help()
 {
 	printf("\n"
@@ -119,60 +137,60 @@ void help()
 "                                  keypoints and building a vocabulary tree \n"
 " Sample usage:\n"
 "\n"
-" ./build_vocab_tree [img_save_dir]\n"
+" ./build_vocab_tree [<img_save_dir>] [<camera-deviceid>]\n"
 "\n"
 "arguments:\n"
-"   img_save_dir -- directory where vocabulary images are saved\n"
-"TODO: vocab_file   -- yml file that stores vocabulary\n\n"
+
+"   <img_save_dir>    -- directory where vocabulary images are saved\n"
+"   <camera-deviceid> -- should be non-negative integer. default camera is 0\n\n"
 );
 }
 
-/*
- Keyboard controls: <ESC>       - quits image capturing mode and starts
-                                  vocabulary tree building 
-                    <SPACE BAR> - saves the image during data collection
-                                - moves to next image while showing
-                                  keypoints and building a vocabulary tree 
- Sample usage:
+//
+// Keyboard controls: <ESC>       - quits image capturing mode and starts
+//                                  vocabulary tree building 
+//                    <SPACE BAR> - saves the image during data collection
+//                                - moves to next image while showing
+//                                   keypoints and building a vocabulary tree 
+// Sample usage:
+//
+// ./build_vocab_tree [<img_save_dir>] [<camera-deviceid>]
+//
+// arguments:
+//   <img_save_dir>    -- directory where vocabulary images are saved
+//   <camera-deviceid> -- should be non-negative integer. default camera is 0
+//
+//   TODO: <vocab_file>   -- yml file that stores vocabulary
 
- ./build_vocab_tree [img_save_dir]
-
-arguments:
-   img_save_dir -- directory where vocabulary images are saved
-TODO: vocab_file   -- yml file that stores vocabulary
- */
 int main(int argc, char *argv[]) {
   string img_save_dir;
+  int cam_deviceid = 0;
   if (argc == 1) {
     help();
     return(0);
   } else if (argc == 2) {
-    if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+    if (!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
       help();
       return(0);
     }
     img_save_dir = string(argv[1]);
-    // FIXME: Assumes linux style directory structure
-    // need to generalize to windows
-    if (img_save_dir[img_save_dir.length() - 1] != '/') {
-      img_save_dir += "/";
+    make_img_directory(&img_save_dir);
+  } else if (argc == 3) {
+    if (!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+      help();
+      return(0);
     }
-    boost::filesystem::path dir(img_save_dir);
-    if (boost::filesystem::exists(dir)) {
-      printf("Sequence directory already exists. Change dir name. Aborting.\n");
-      return -1;
-    }
-    if (boost::filesystem::create_directory(dir)) {
-      printf("Directory '%s' created\n", img_save_dir.c_str());
-    }
+    img_save_dir = string(argv[1]);
+    make_img_directory(&img_save_dir);
+    cam_deviceid = boost::lexical_cast<int>(argv[2]);
   } else {
     //incorrect arguments
-    printf("Usage: build_vocab_tree <img_save_dir>\n");
+    help();
     return -1; 
   }
 
   // read images from camera
-  cv::VideoCapture cap(1);
+  cv::VideoCapture cap(cam_deviceid);
   if (!cap.isOpened()) {
     printf("Opening the default camera did not succeed\n"); 
     return -1;

@@ -56,7 +56,7 @@ static void help()
   printf("\n\n"
   "Usage:\n"
   "   ./build_training_map <vocab file name> <directory to put logged images into> [<camera device-id>]\n"
-  "<camera device-id> is optional - should be a non-negative integer. default camera is zero"
+  "<camera-device-id> is optional - should be a non-negative integer. default camera is zero"
   "\n"
   "Press space collect each image to put into the map\n"
   "ESC will end\n"
