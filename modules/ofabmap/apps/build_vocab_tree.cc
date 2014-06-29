@@ -1,9 +1,14 @@
+/**
+ * This code takes images, extracts keypoints and descriptors and clusters them into a vocabulary tree
+ */
+
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/contrib/contrib.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/features2d.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <cstdio>
 
@@ -31,11 +36,14 @@ static bool WriteVocabulary(const string& filename, const Mat& vocabulary) {
 
 static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
     float descriptor_proportion) {
-  const int kvocab_size = 100;
+//If you have fewer descriptors than kvocab_size, it will crash in kmeans. But, set this appropriately large
+  const int kvocab_size = 300; //Should be large enough to create a rich vocab relative to your data
   cv::RNG rng(1234);
   Ptr<FeatureDetector> fdetector(new DynamicAdaptedFeatureDetector(
-            AdjusterAdapter::create("STAR"), 130, 150, 5));
-  Ptr<DescriptorExtractor> dextractor(new SurfDescriptorExtractor(1000, 4, 2, false, true));
+            AdjusterAdapter::create("SURF"), 100, 130, 5));
+  Ptr<DescriptorExtractor> dextractor = 
+    // DescriptorExtractor::create("SIFT");
+    (new SurfDescriptorExtractor(1000, 4, 2, false, true));
 
   TermCriteria terminate_criterion; 
   terminate_criterion.epsilon = FLT_EPSILON;
@@ -102,47 +110,87 @@ static cv::Mat TrainVocabulary(const string &vocab_dir, int total_frames,
   return vocabulary; 
 }
 
-/*
- Keyboard controls: <ESC>       - quits image capturing mode and starts
-                                  vocabulary tree building 
-                    <SPACE BAR> - saves the image during data collection
-                                - moves to next image while showing
-                                  keypoints and building a vocabulary tree 
- Sample usage:
+// directory creation utility function
+static void make_img_directory(string *img_save_dir) {
+  // FIXME: Assumes linux style directory structure
+  // need to generalize to windows
+  if ((*img_save_dir)[img_save_dir->length() - 1] != '/') {
+    *img_save_dir += "/";
+  }
+  boost::filesystem::path dir(*img_save_dir);
+  if (boost::filesystem::exists(dir)) {
+    printf("Sequence directory already exists. Change dir name. Aborting. \n");
+    exit(-1);
+  }
+  if (boost::filesystem::create_directory(dir)) {
+    printf("Directory '%s' created\n", img_save_dir->c_str());
+  }
+}
 
- ./build_vocab_tree [img_save_dir]
+void help()
+{
+	printf("\n"
+" Keyboard controls: <ESC>       - quits image capturing mode and starts\n"
+"                                  vocabulary tree building \n"
+"                    <SPACE BAR> - saves the image during data collection\n"
+"                                - moves to next image while showing\n"
+"                                  keypoints and building a vocabulary tree \n"
+" Sample usage:\n"
+"\n"
+" ./build_vocab_tree [<img_save_dir>] [<camera-deviceid>]\n"
+"\n"
+"arguments:\n"
 
-arguments:
-   img_save_dir -- directory where vocabulary images are saved
-TODO: vocab_file   -- yml file that stores vocabulary
- */
+"   <img_save_dir>    -- directory where vocabulary images are saved\n"
+"   <camera-deviceid> -- should be non-negative integer. default camera is 0\n\n"
+);
+}
+
+//
+// Keyboard controls: <ESC>       - quits image capturing mode and starts
+//                                  vocabulary tree building 
+//                    <SPACE BAR> - saves the image during data collection
+//                                - moves to next image while showing
+//                                   keypoints and building a vocabulary tree 
+// Sample usage:
+//
+// ./build_vocab_tree [<img_save_dir>] [<camera-deviceid>]
+//
+// arguments:
+//   <img_save_dir>    -- directory where vocabulary images are saved
+//   <camera-deviceid> -- should be non-negative integer. default camera is 0
+//
+//   TODO: <vocab_file>   -- yml file that stores vocabulary
+
 int main(int argc, char *argv[]) {
   string img_save_dir;
+  int cam_deviceid = 0;
   if (argc == 1) {
-    img_save_dir = "fabmap/";
+    help();
+    return(0);
   } else if (argc == 2) {
+    if (!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+      help();
+      return(0);
+    }
     img_save_dir = string(argv[1]);
-    // FIXME: Assumes linux style directory structure
-    // need to generalize to windows
-    if (img_save_dir[img_save_dir.length() - 1] != '/') {
-      img_save_dir += "/";
+    make_img_directory(&img_save_dir);
+  } else if (argc == 3) {
+    if (!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+      help();
+      return(0);
     }
-    boost::filesystem::path dir(img_save_dir);
-    if (boost::filesystem::exists(dir)) {
-      printf("Sequence directory already exists. Change dir name. Aborting.\n");
-      return -1;
-    }
-    if (boost::filesystem::create_directory(dir)) {
-      printf("Directory '%s' created\n", img_save_dir.c_str());
-    }
+    img_save_dir = string(argv[1]);
+    make_img_directory(&img_save_dir);
+    cam_deviceid = boost::lexical_cast<int>(argv[2]);
   } else {
     //incorrect arguments
-    printf("Usage: build_vocab_tree <img_save_dir>\n");
+    help();
     return -1; 
   }
 
   // read images from camera
-  cv::VideoCapture cap(1);
+  cv::VideoCapture cap(cam_deviceid);
   if (!cap.isOpened()) {
     printf("Opening the default camera did not succeed\n"); 
     return -1;
@@ -154,7 +202,9 @@ int main(int argc, char *argv[]) {
     cap >> frame;
     imshow("input RGB image", frame);
     int keyp = waitKey(30);
-    if (keyp == 27) {
+    if(keyp == 'h')
+      help();
+    else if (keyp == 27) {
       printf("Done capturing.\n");
       break;
     } else if (keyp == 32) {
@@ -166,6 +216,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  destroyWindow("input RGB image");
   const float kdescriptor_proportion = 0.7;
   cv::Mat vocabulary = TrainVocabulary(img_save_dir, framenum - 1, kdescriptor_proportion);
   string filename = "vocab_big.yml";
