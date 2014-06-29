@@ -42,7 +42,7 @@ build/modules/multi_fisheye_calib/apps/./multi_fisheye_calib
 ````
 
 ### OpenFabMap sample
-Three important binaries to get live_fabmap working. Samples for running each of them are given below in sequence.
+There are three important binaries to get live_fabmap working. Samples for running each of them are given below in sequence.
 To know the meaning of the parameters, say ./binary --help
 For eg. ./build_vocab_tree --help
 In general, for both build_vocab_tree and build_training_map more images the better. Vocabulary should have enough
