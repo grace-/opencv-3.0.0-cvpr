@@ -102,7 +102,6 @@ int main(int argc, char *argv[]) {
     cam_deviceid = boost::lexical_cast<int>(argv[3]);
   }
 
-
   cv::Mat vocabulary = LoadVocabFile(vocab_file);
   if (vocabulary.empty()) {
     printf("aborting\n");
@@ -138,11 +137,9 @@ int main(int argc, char *argv[]) {
     if (keyp == 27) {
       printf("Done capturing.\n");
       break;
-    } else if (keyp == 'h')
-    {
-		help();
-	} 
-    else if (keyp == 32) {
+    } else if (keyp == 'h') {
+      help();
+    } else if (keyp == 32) {
       Mat visualword_descriptor;
       vector<KeyPoint> kpts;
       detector->detect(frame, kpts);

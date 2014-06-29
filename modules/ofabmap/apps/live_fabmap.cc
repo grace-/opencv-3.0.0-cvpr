@@ -1,275 +1,220 @@
-/*M///////////////////////////////////////////////////////////////////////////////////////
-//
-//  IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
-//
-//  By downloading, copying, installing or using the software you agree to this license.
-//  If you do not agree to this license, do not download, install,
-//  copy or use the software.
-//
-// This file originates from the openFABMAP project:
-// [http://code.google.com/p/openfabmap/]
-//
-// For published work which uses all or part of OpenFABMAP, please cite:
-// [http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=6224843]
-//
-// Original Algorithm by Mark Cummins and Paul Newman:
-// [http://ijr.sagepub.com/content/27/6/647.short]
-// [http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=5613942]
-// [http://ijr.sagepub.com/content/30/9/1100.abstract]
-//
-//                           License Agreement
-//
-// Copyright (C) 2012 Arren Glover [aj.glover@qut.edu.au] and
-//                    Will Maddern [w.maddern@qut.edu.au], all rights reserved.
-//
-//
-// Redistribution and use in source and binary forms, with or without modification,
-// are permitted provided that the following conditions are met:
-//
-//   * Redistribution's of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//
-//   * Redistribution's in binary form must reproduce the above copyright notice,
-//     this list of conditions and the following disclaimer in the documentation
-//     and/or other materials provided with the distribution.
-//
-//   * The name of the copyright holders may not be used to endorse or promote products
-//     derived from this software without specific prior written permission.
-//
-// This software is provided by the copyright holders and contributors "as is" and
-// any express or implied warranties, including, but not limited to, the implied
-// warranties of merchantability and fitness for a particular purpose are disclaimed.
-// In no event shall the Intel Corporation or contributors be liable for any direct,
-// indirect, incidental, special, exemplary, or consequential damages
-// (including, but not limited to, procurement of substitute goods or services;
-// loss of use, data, or profits; or business interruption) however caused
-// and on any theory of liability, whether in contract, strict liability,
-// or tort (including negligence or otherwise) arising in any way out of
-// the use of this software, even if advised of the possibility of such damage.
-//
-//M*/
-
+/* this file is to demonstrate live FAB-MAP matching 
+ * fabmap approach is based on the openfabmap implementation
+ * @author - Prasanna Krishnasamy (pras.bits@gmail.com)
+ */
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/nonfree/nonfree.hpp"
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 #include <cstdio>
 
 using namespace cv;
 using namespace std;
 
-void help() {
-
+static void help() {
+  printf("Sample usage:\n"
+    "live_fabmap <ymlfile directory> <map data dir> <cameraid>\n\n"
+    "  <ymlfile directory> where vocab and chow-liu tree ymls are stored\n"
+    "  <map data dir>      where images for map are stored\n"
+    "  <cameraid>          non-negative integer indicating cameraid\n"
+    );
 }
 
 int main(int argc, char * argv[]) {
+  printf("This sample program demonstrates live FAB-MAP image matching "
+         "algorithm\n\n");
 
-    /*
+  string dataDir, mapDir;
+  int cam_deviceid = 0;
+  if (argc == 1) {
+      //incorrect arguments
+      help();
+      return (-1);
+  } else if (argc == 2) {
+      if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+        help();
+        return(-1);
+      }
+      dataDir = string(argv[1]);
+      dataDir += "/";
+  } else if (argc == 3) {
+      if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+        help();
+        return(-1);
+      }
+      dataDir = string(argv[1]);
+      dataDir += "/";
+      mapDir = string(argv[2]);
+      mapDir += "/";
+  } else if (argc == 4) {
+      if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+        help();
+        return(-1);
+      }
+      dataDir = string(argv[1]);
+      dataDir += "/";
+      mapDir = string(argv[2]);
+      mapDir += "/";
+      cam_deviceid = boost::lexical_cast<int>(argv[3]);
+  } else {
+      //incorrect arguments
+      help();
+      return -1;
+  }
 
-    Note: the vocabulary and training data is specifically made for this openCV
-    example. It is not reccomended for use with other datasets as it is
-    intentionally small to reduce baggage in the openCV project.
+  FileStorage fs;
 
-    A new vocabulary can be generated using the supplied BOWMSCtrainer (or other
-    clustering method such as K-means
+  //load/generate vocab
+  cout << "Loading Vocabulary: " <<
+      dataDir + string("vocab_big.yml") << endl << endl;
+  fs.open(dataDir + string("vocab_big.yml"), FileStorage::READ);
+  Mat vocab;
+  fs["Vocabulary"] >> vocab;
+  if (vocab.empty()) {
+      cerr << "Vocabulary not found" << endl;
+      return -1;
+  }
+  fs.release();
 
-    New training data can be generated by extracting bag-of-words using the
-    openCV BOWImgDescriptorExtractor class.
+  //load/generate training data
 
-    vocabulary, chow-liu tree, training data, and test data can all be saved and
-    loaded using openCV's FileStorage class and it is not necessary to generate
-    data each time as done in this example
+  cout << "Loading Training Data: " <<
+      dataDir + string("training_data.yml") << endl << endl;
+  fs.open(dataDir + string("training_data.yml"), FileStorage::READ);
+  Mat trainData;
+  fs["BOWImageDescs"] >> trainData;
+  if (trainData.empty()) {
+      cerr << "Training Data not found" << endl;
+      return -1;
+  }
+  fs.release();
 
-    */
+  //create Chow-liu tree
+  printf("Making Chow-Liu Tree from training data\n");
+  of2::ChowLiuTree treeBuilder;
+  treeBuilder.add(trainData);
+  Mat tree = treeBuilder.make();
 
-    cout << "This sample program demonstrates the FAB-MAP image matching "
-        "algorithm" << endl << endl;
+  //generate test data
+  printf("Extracting Test Data from images\n");
+  Ptr<FeatureDetector> detector =
+      new DynamicAdaptedFeatureDetector(
+      AdjusterAdapter::create("SURF"), 100, 130, 5);
+  Ptr<DescriptorExtractor> extractor =
+      // DescriptorExtractor::create("SIFT");
+      new SurfDescriptorExtractor(1000, 4, 2, false, true);
+  Ptr<DescriptorMatcher> matcher =
+      DescriptorMatcher::create("FlannBased");
 
-    string dataDir, mapDir;
-    if (argc == 1) {
-        //incorrect arguments
-        cout << "Usage: live_fabmap <vocab & train yml files directory> <map data dir>" <<
-            endl;
-        return (-1);
-    } else if (argc == 2) {
-        if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
-            cout << "Usage: live_fabmap <sample data directory> <map data dir>" <<
-                endl;
-            return(-1);
-        }
-        dataDir = string(argv[1]);
-        dataDir += "/";
-    } else if (argc == 3) {
-	dataDir = string(argv[1]);
-        dataDir += "/";
-	mapDir = string(argv[2]);
-	mapDir += "/";
-    } else {
-        //incorrect arguments
-        cout << "Usage: live_fabmap <sample data directory> <map data dir>" <<
-            endl;
-        return -1;
-    }
+  BOWImgDescriptorExtractor bide(extractor, matcher);
+  bide.setVocabulary(vocab);
 
-    FileStorage fs;
+  vector<string> imageNames;
+  namespace bfs = boost::filesystem;
 
-    //load/generate vocab
-    cout << "Loading Vocabulary: " <<
-        dataDir + string("vocab_big.yml") << endl << endl;
-    fs.open(dataDir + string("vocab_big.yml"), FileStorage::READ);
-    Mat vocab;
-    fs["Vocabulary"] >> vocab;
-    if (vocab.empty()) {
-        cerr << "Vocabulary not found" << endl;
-        return -1;
-    }
-    fs.release();
-
-    //load/generate training data
-
-    cout << "Loading Training Data: " <<
-        dataDir + string("training_data.yml") << endl << endl;
-    fs.open(dataDir + string("training_data.yml"), FileStorage::READ);
-    Mat trainData;
-    fs["BOWImageDescs"] >> trainData;
-    if (trainData.empty()) {
-        cerr << "Training Data not found" << endl;
-        return -1;
-    }
-    fs.release();
-
-    //create Chow-liu tree
-    cout << "Making Chow-Liu Tree from training data" << endl <<
-        endl;
-    of2::ChowLiuTree treeBuilder;
-    treeBuilder.add(trainData);
-    Mat tree = treeBuilder.make();
-
-    //generate test data
-    cout << "Extracting Test Data from images" << endl <<
-        endl;
-    Ptr<FeatureDetector> detector =
-        new DynamicAdaptedFeatureDetector(
-        AdjusterAdapter::create("SURF"), 100, 130, 5);
-    Ptr<DescriptorExtractor> extractor =
-        // DescriptorExtractor::create("SIFT");
-        new SurfDescriptorExtractor(1000, 4, 2, false, true);
-    Ptr<DescriptorMatcher> matcher =
-        DescriptorMatcher::create("FlannBased");
-
-    BOWImgDescriptorExtractor bide(extractor, matcher);
-    bide.setVocabulary(vocab);
-
-    vector<string> imageNames;
-    namespace bfs = boost::filesystem;
-
-    bfs::path p(mapDir);
-    bfs::directory_iterator end_iter;
-    if (bfs::is_directory(p)) {
-      for (bfs::directory_iterator dir_iter(p); dir_iter != end_iter;
-          ++dir_iter) {
-        if (bfs::is_regular_file(dir_iter->status()) ) {
-          printf("%s\n", dir_iter->path().c_str());
-          imageNames.push_back(dir_iter->path().native());
-        }
+  bfs::path p(mapDir);
+  bfs::directory_iterator end_iter;
+  if (bfs::is_directory(p)) {
+    for (bfs::directory_iterator dir_iter(p); dir_iter != end_iter;
+        ++dir_iter) {
+      if (bfs::is_regular_file(dir_iter->status()) ) {
+        printf("%s\n", dir_iter->path().c_str());
+        imageNames.push_back(dir_iter->path().native());
       }
     }
+  }
 
-    std::sort(imageNames.begin(), imageNames.end());
+  std::sort(imageNames.begin(), imageNames.end());
 
-    printf("Number of image files being processed is %lu\n", imageNames.size());
+  printf("Number of image files being processed is %lu\n", imageNames.size());
 
-    Mat testData;
+  Mat testData;
+  Mat frame;
+  Mat bow;
+  vector<KeyPoint> kpts;
+  vector<Mat> map_images;
+
+  for(size_t i = 0; i < imageNames.size(); i++) {
+      cout << imageNames[i] << endl;
+      frame = imread(imageNames[i]);
+      if(frame.empty()) {
+          printf("Test images not found\n");
+          return -1;
+      }
+
+      map_images.push_back(frame);
+      detector->detect(frame, kpts);
+      bide.compute(frame, kpts, bow);
+      testData.push_back(bow);
+
+      // drawKeypoints(frame, kpts, frame);
+      // imshow(imageNames[i], frame);
+      // waitKey(10);
+  }
+
+  //run fabmap
+  printf("Running FAB-MAP algorithm\n\n");
+  Ptr<of2::FabMap> fabmap;
+
+  fabmap = new of2::FabMap2(tree, 0.39, 0, of2::FabMap::SAMPLED |
+                            of2::FabMap::CHOW_LIU);
+  fabmap->addTraining(trainData);
+
+  vector<of2::IMatch> matches;
+  fabmap->compare(testData, matches, true);
+  
+  // read images from camera
+  cv::VideoCapture cap(cam_deviceid);
+  if (!cap.isOpened()) {
+    printf("Opening the default camera did not succeed\n");
+    return -1;
+  }
+
+  int framenum = 0;
+  for (;;) {
     Mat frame;
-    Mat bow;
+    cap >> frame;
+
+    Mat visualword_descriptor;
     vector<KeyPoint> kpts;
-    
-    vector<Mat> map_images;
+    detector->detect(frame, kpts);
 
-    for(size_t i = 0; i < imageNames.size(); i++) {
-        cout << imageNames[i] << endl;
-        frame = imread(imageNames[i]);
-        if(frame.empty()) {
-            cerr << "Test images not found" << endl;
-            return -1;
-        }
-        
-        map_images.push_back(frame);
-
-        detector->detect(frame, kpts);
-
-        bide.compute(frame, kpts, bow);
-
-        testData.push_back(bow);
-
-        // drawKeypoints(frame, kpts, frame);
-        // imshow(imageNames[i], frame);
-        // waitKey(10);
-    }
-
-    //run fabmap
-    cout << "Running FAB-MAP algorithm" << endl <<
-        endl;
-    Ptr<of2::FabMap> fabmap;
-
-    fabmap = new of2::FabMap2(tree, 0.39, 0, of2::FabMap::SAMPLED |
-        of2::FabMap::CHOW_LIU);
-    fabmap->addTraining(trainData);
+    drawKeypoints(frame, kpts, frame);
+    imshow("input RGB image", frame);
+    bide.compute(frame, kpts, visualword_descriptor);
 
     vector<of2::IMatch> matches;
-    fabmap->compare(testData, matches, true);
-    
-    // read images from camera
-    cv::VideoCapture cap(1);
-    if (!cap.isOpened()) {
-      printf("Opening the default camera did not succeed\n");
-      return -1;
-    }
+    fabmap->compare(visualword_descriptor, matches);
 
-    int framenum = 0;
-    for (;;) {
-      Mat frame;
-      cap >> frame;
-       
-      Mat visualword_descriptor;
-      vector<KeyPoint> kpts;
-      detector->detect(frame, kpts);
+    vector<of2::IMatch>::iterator l;
 
-      drawKeypoints(frame, kpts, frame);
-      imshow("input RGB image", frame);
-      bide.compute(frame, kpts, visualword_descriptor);
- 
-      vector<of2::IMatch> matches;
-      fabmap->compare(visualword_descriptor, matches);
-
-      vector<of2::IMatch>::iterator l;
-
-      double max_prob = 0;
-      int max_img_idx = -1;
-      cout << "---------------------" << endl;
-      for (l = matches.begin(); l != matches.end(); l++) {
-        cout << "prob is " << l->match << endl;
-        if (max_prob < l->match) {
-           max_prob = l->match;
-           max_img_idx = l->imgIdx;
-        }
-      }
-
-      // cout << " Max idx is " << max_img_idx << endl;
-      cv::Mat disp_image;
-      if (max_img_idx == -1) {
-        disp_image = Mat::zeros(frame.rows, frame.cols, CV_8UC3);
-      } else {
-        disp_image = map_images[max_img_idx];
-      } 
-      cv::imshow("Closest Map image", disp_image);
-      int keyp = cv::waitKey(10);
-      if (keyp == 27) {
-        printf("Done capturing.\n");
-        break;
-      } else if (keyp == 'h') {
-	help();
+    double max_prob = 0;
+    int max_img_idx = -1;
+    printf("---------------------\n");
+    for (l = matches.begin(); l != matches.end(); l++) {
+      printf("prob is %f\n", l->match);
+      if (max_prob < l->match) {
+         max_prob = l->match;
+         max_img_idx = l->imgIdx;
       }
     }
-    return 0;
+
+    // cout << " Max idx is " << max_img_idx << endl;
+    cv::Mat disp_image;
+    if (max_img_idx == -1) {
+      disp_image = Mat::zeros(frame.rows, frame.cols, CV_8UC3);
+    } else {
+      disp_image = map_images[max_img_idx];
+    }
+    cv::imshow("Closest Map image", disp_image);
+    int keyp = cv::waitKey(10);
+    if (keyp == 27) {
+      printf("Done capturing.\n");
+      break;
+    } else if (keyp == 'h') {
+      help();
+    }
+  }
+  return 0;
 }
