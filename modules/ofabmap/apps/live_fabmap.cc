@@ -28,52 +28,52 @@ int main(int argc, char * argv[]) {
   string dataDir, mapDir;
   int cam_deviceid = 0;
   if (argc == 1) {
-      //incorrect arguments
-      help();
-      return (-1);
+    //incorrect arguments
+    help();
+    return (-1);
   } else if (argc == 2) {
-      if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
-        help();
-        return(-1);
-      }
-      dataDir = string(argv[1]);
-      dataDir += "/";
-  } else if (argc == 3) {
-      if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
-        help();
-        return(-1);
-      }
-      dataDir = string(argv[1]);
-      dataDir += "/";
-      mapDir = string(argv[2]);
-      mapDir += "/";
-  } else if (argc == 4) {
-      if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
-        help();
-        return(-1);
-      }
-      dataDir = string(argv[1]);
-      dataDir += "/";
-      mapDir = string(argv[2]);
-      mapDir += "/";
-      cam_deviceid = boost::lexical_cast<int>(argv[3]);
-  } else {
-      //incorrect arguments
+    if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
       help();
-      return -1;
+      return(-1);
+    }
+    dataDir = string(argv[1]);
+    dataDir += "/";
+  } else if (argc == 3) {
+    if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+      help();
+      return(-1);
+    }
+    dataDir = string(argv[1]);
+    dataDir += "/";
+    mapDir = string(argv[2]);
+    mapDir += "/";
+  } else if (argc == 4) {
+    if(!strcmp(argv[1],"-h") || !strcmp(argv[1],"--help")) {
+      help();
+      return(-1);
+    }
+    dataDir = string(argv[1]);
+    dataDir += "/";
+    mapDir = string(argv[2]);
+    mapDir += "/";
+    cam_deviceid = boost::lexical_cast<int>(argv[3]);
+  } else {
+    //incorrect arguments
+    help();
+    return -1;
   }
 
   FileStorage fs;
 
   //load/generate vocab
   cout << "Loading Vocabulary: " <<
-      dataDir + string("vocab_big.yml") << endl << endl;
+    dataDir + string("vocab_big.yml") << endl << endl;
   fs.open(dataDir + string("vocab_big.yml"), FileStorage::READ);
   Mat vocab;
   fs["Vocabulary"] >> vocab;
   if (vocab.empty()) {
-      cerr << "Vocabulary not found" << endl;
-      return -1;
+    cerr << "Vocabulary not found" << endl;
+    return -1;
   }
   fs.release();
 
@@ -85,8 +85,8 @@ int main(int argc, char * argv[]) {
   Mat trainData;
   fs["BOWImageDescs"] >> trainData;
   if (trainData.empty()) {
-      cerr << "Training Data not found" << endl;
-      return -1;
+    cerr << "Training Data not found" << endl;
+    return -1;
   }
   fs.release();
 
@@ -136,21 +136,21 @@ int main(int argc, char * argv[]) {
   vector<Mat> map_images;
 
   for(size_t i = 0; i < imageNames.size(); i++) {
-      cout << imageNames[i] << endl;
-      frame = imread(imageNames[i]);
-      if(frame.empty()) {
-          printf("Test images not found\n");
-          return -1;
-      }
+    cout << imageNames[i] << endl;
+    frame = imread(imageNames[i]);
+    if (frame.empty()) {
+      printf("Test images not found\n");
+      return -1;
+    }
 
-      map_images.push_back(frame);
-      detector->detect(frame, kpts);
-      bide.compute(frame, kpts, bow);
-      testData.push_back(bow);
+    map_images.push_back(frame);
+    detector->detect(frame, kpts);
+    bide.compute(frame, kpts, bow);
+    testData.push_back(bow);
 
-      // drawKeypoints(frame, kpts, frame);
-      // imshow(imageNames[i], frame);
-      // waitKey(10);
+    // drawKeypoints(frame, kpts, frame);
+    // imshow(imageNames[i], frame);
+    // waitKey(10);
   }
 
   //run fabmap
@@ -195,8 +195,8 @@ int main(int argc, char * argv[]) {
     for (l = matches.begin(); l != matches.end(); l++) {
       printf("prob is %f\n", l->match);
       if (max_prob < l->match) {
-         max_prob = l->match;
-         max_img_idx = l->imgIdx;
+        max_prob = l->match;
+        max_img_idx = l->imgIdx;
       }
     }
 
