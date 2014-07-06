@@ -253,7 +253,7 @@ ENDIF()
 #------------------------------------------------
 ADD_SUBDIRECTORY(src)
 IF(NOT ANDROID_CREATION)
-#  ADD_SUBDIRECTORY(utils)
+  ADD_SUBDIRECTORY(utils)
 ENDIF()
 
 
