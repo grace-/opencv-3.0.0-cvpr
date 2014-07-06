@@ -397,7 +397,8 @@ int main(int argc, char *argv[]) {
                   all_stereo_match_idx.size());
               for (int j = 0; j < all_stereo_match_idx.size(); ++j) {
                 for (int k = 0; k < all_stereo_match_idx[j].size(); ++k) {
-                  const std::pair<int, int> &stereo_pair = all_stereo_match_idx[j][k];
+                  const std::pair<int, int> &stereo_pair =
+                      all_stereo_match_idx[j][k];
                   for (int l = 0; l < 4; ++l) {
                     imagePoints1[j].push_back(
                         all_rig_detections_2f[0][j][stereo_pair.first * 4 + l]);
@@ -430,48 +431,7 @@ int main(int argc, char *argv[]) {
                         << "  rms = " << rms << std::endl;
             }          
           }
-        }
-        //   int i = 1;
-        //   cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
-        //   // cv::Mat D = cv::Mat::ones(6,1,CV_64F);
-        //   // std::vector<cv::Mat> rvec;
-        //   // std::vector<cv::Mat> tvec;       
-          
-        //   cv::Vec4d D;   
-        //   std::vector<cv::Vec3f> rvec;
-        //   std::vector<cv::Vec3f> tvec;
-          
-        //   std::cout << "camera " << i << " 3f: num_captures = "
-        //             << all_rig_detections_3f[i].size() << std::endl;
-        //   std::cout << "camera " << i << " 2f: num_captures = "
-        //             << all_rig_detections_2f[i].size() << std::endl;
-          
-        //   std::cout << "camera " << i << " imsize = " 
-        //             << cameras[i].size << std::endl;
-        //   std::cout << "camera " << i << " K = " << K << std::endl;
-        //   std::cout << "camera " << i << " D = " << D << std::endl;
-        //   std::cout << "camera " << i << " rvecs = " << rvec.size() << std::endl;
-        //   std::cout << "camera " << i << " tvecs = " << tvec.size() << std::endl;
-          
-        //   // for (int j = 0; j < all_rig_detections_3f[i].size(); ++j ) {
-        //   //   std::cout << "capture " << j << " 3f num pts = " 
-        //   //             << all_rig_detections_3f[i][j].size() << std::endl;
-        //   //   std::cout << "capture " << j << " 2f num pts = " 
-        //   //             << all_rig_detections_2f[i][j].size() << std::endl;
-        //   // }
-        //   const std::vector<std::vector<cv::Point3f> > &tmp1 = all_rig_detections_3f[i];
-        //   const std::vector<std::vector<cv::Point2f> > &tmp2 = all_rig_detections_2f[i];
-          
-        //   rms = cv::fisheye::calibrate(tmp1, tmp2,                                        
-        //                             cameras[i].size,
-        //                             K, D, rvec, tvec);
-                   
-        //   std::cout << "hello!\n";
-        //   std::cout << "camera " << i << " K = " << K << std::endl;
-        //   std::cout << "camera " << i << " D = " << D << std::endl;
-        //   std::cout << "camera " << i << " rvecs = " << rvec.size() << std::endl;
-        //   std::cout << "camera " << i << " tvecs = " << tvec.size() << std::endl;
-        //   // }
+        } 
         for (int i = 0; i < num_cameras; ++i) {
           all_rig_detections_3f[i].clear();
           all_rig_detections_2f[i].clear();
