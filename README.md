@@ -6,20 +6,20 @@ This repository contains the code demonstrated at the OpenCV 3.0 Tutorial for CV
 
 ### Installing local OpenCV 3.0.0
 ````
-cd opencv
-mkdir build
-cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=../install
-make -j<# processors to use> install
+$ cd opencv
+$ -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=TRUE -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=TRUE mkdir build
+$ cd build
+$ cmake .. -DCMAKE_INSTALL_PREFIX=../install
+$ make -j<# processors to use> install
 ````
 
 ### Installing local Aruco 
 ````
-cd 3rd_party/aruco/trunk/
-mkdir build
-cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=../install
-make -j<# processors to use> install
+$ cd 3rd_party/aruco/trunk/
+$ mkdir build
+$ cd build
+$ cmake .. -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=TRUE
+$ make -j<# processors to use> install
 ````
 
 ## Apps
@@ -27,18 +27,18 @@ make -j<# processors to use> install
 ### Install
 Requires system install of Boost.
 ````
-sudo apt-get install libboost-all-dev
+$ sudo apt-get install libboost-all-dev
 
-mkdir build
-cd build
-cmake ..
-make -j<# processors to use>
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make -j<# processors to use>
 ````
 
 ### Multiple fisheye camera calibration
 
 ````
-build/modules/multi_fisheye_calib/apps/./multi_fisheye_calib
+$ build/modules/multi_fisheye_calib/apps/./multi_calib_test_video 0
 ````
 
 ### OpenFabMap sample
